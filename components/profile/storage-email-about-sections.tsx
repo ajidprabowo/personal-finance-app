@@ -82,12 +82,7 @@ export function EmailIntegrationSection() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const next = await connectGmailAccount();
-      setSession(next);
-      notifySuccess(
-        'Gmail connected',
-        `Connected read-only access for ${next.connection?.emailAddress ?? 'Gmail'}.`
-      );
+      await connectGmailAccount();
     } catch (error) {
       notifyError('Gmail connection failed', error);
     } finally {
@@ -157,7 +152,7 @@ export function EmailIntegrationSection() {
     >
       <SettingsItem
         label="Connection Status"
-        description="Scope requested: gmail.readonly. Access tokens live strictly in active session memory and are never written to IndexedDB or localStorage."
+        description="Scope requested: gmail.readonly. Refresh credentials are encrypted in a secure server session and never written to IndexedDB."
         control={
           <span className={`rounded border px-2.5 py-1 text-xs font-medium ${statusClass}`}>
             {statusBadge}

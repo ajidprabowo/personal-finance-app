@@ -61,7 +61,7 @@ export function SecurityPrivacySection() {
 
       <SettingsItem
         label="Future Gmail Integration Architecture"
-        description="When Gmail OAuth sync is introduced in a future stage, OAuth tokens will be handled securely server-side via environment-configured API routes rather than stored inside local browser financial records."
+        description="Gmail OAuth refresh credentials are handled by server API routes in an encrypted, HttpOnly session cookie and are never stored in local browser financial records."
         control={
           <span className="inline-flex items-center gap-1.5 rounded border border-line bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-muted">
             <MailCheck className="h-3.5 w-3.5" aria-hidden="true" />

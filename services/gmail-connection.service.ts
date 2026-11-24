@@ -109,38 +109,37 @@ export async function getGmailSessionSnapshot(): Promise<GmailSessionSnapshot> {
     };
   }
 
-  const { getInMemoryGmailSessionInfo } = await import('@/lib/gmail-auth');
-  const session = getInMemoryGmailSessionInfo();
+  const response = await fetch('/api/gmail/profile', { cache: 'no-store' });
+  const profile = (await response.json().catch(() => null)) as
+    | { emailAddress?: string }
+    | null;
 
-  let effectiveStatus: EmailConnectionStatus = connection?.status ?? 'disconnected';
-  if (connection?.status === 'connected' && !session.hasActiveToken) {
-    effectiveStatus = 'token_expired';
-  } else if (session.hasActiveToken && connection?.status !== 'disconnected') {
-    effectiveStatus = 'connected';
+  if (response.ok && profile?.emailAddress) {
+    const connected = await recordGmailConnected(profile.emailAddress);
+    return {
+      connection: connected,
+      hasActiveToken: true,
+      tokenEmailAddress: profile.emailAddress,
+      effectiveStatus: 'connected',
+    };
   }
 
+  const effectiveStatus: EmailConnectionStatus =
+    connection?.status === 'connected' ? 'token_expired' : connection?.status ?? 'disconnected';
   return {
     connection,
-    hasActiveToken: session.hasActiveToken,
-    tokenEmailAddress: session.emailAddress,
+    hasActiveToken: false,
+    tokenEmailAddress: null,
     effectiveStatus,
   };
 }
 
-export async function connectGmailAccount(): Promise<GmailSessionSnapshot> {
+export async function connectGmailAccount(): Promise<void> {
   if (typeof window === 'undefined') {
     throw new Error('Gmail interactive sign-in must run in the browser.');
   }
-  const { connectGmailWithGooglePopup } = await import('@/lib/gmail-auth');
-  const result = await connectGmailWithGooglePopup();
-  const connection = await recordGmailConnected(result.emailAddress);
-
-  return {
-    connection,
-    hasActiveToken: true,
-    tokenEmailAddress: result.emailAddress,
-    effectiveStatus: 'connected',
-  };
+  const { beginGmailOAuth } = await import('@/lib/gmail-auth');
+  beginGmailOAuth();
 }
 
 export async function disconnectGmailAccount(): Promise<GmailSessionSnapshot> {

@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  extractBearerTokenFromHeader,
   fetchGmailProfileServer,
   GmailServerError,
 } from '@/lib/gmail-server';
+import { getGmailSession, refreshGmailAccessToken } from '@/lib/gmail-oauth-server';
 
 export async function GET(req: NextRequest) {
-  const token = extractBearerTokenFromHeader(req.headers.get('authorization'));
-  if (!token) {
+  const session = getGmailSession(req);
+  if (!session) {
     return NextResponse.json(
-      { error: 'Missing or invalid Bearer authorization header.', code: 'UNAUTHORIZED' },
+      { error: 'Gmail is not connected.', code: 'UNAUTHORIZED' },
       { status: 401 }
     );
   }
 
   try {
+    const token = await refreshGmailAccessToken(session);
     const profile = await fetchGmailProfileServer(token);
     return NextResponse.json({
       emailAddress: profile.emailAddress,
@@ -28,8 +29,8 @@ export async function GET(req: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'Failed to verify Gmail profile.', code: 'UPSTREAM_ERROR' },
-      { status: 500 }
+      { error: 'Gmail authorization has expired or could not be refreshed.', code: 'TOKEN_EXPIRED' },
+      { status: 401 }
     );
   }
 }

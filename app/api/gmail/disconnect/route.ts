@@ -1,28 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  extractBearerTokenFromHeader,
-  GOOGLE_REVOKE_ENDPOINT,
-} from '@/lib/gmail-server';
+  clearGmailSessionCookie,
+  getGmailSession,
+  revokeGoogleToken,
+} from '@/lib/gmail-oauth-server';
 
 export async function POST(req: NextRequest) {
-  const token = extractBearerTokenFromHeader(req.headers.get('authorization'));
-  if (!token) {
-    return NextResponse.json({ revoked: false });
-  }
-
+  const session = getGmailSession(req);
+  let revoked = false;
   try {
-    const body = new URLSearchParams({ token });
-    const res = await fetch(GOOGLE_REVOKE_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: body.toString(),
-      cache: 'no-store',
-    });
-
-    return NextResponse.json({ revoked: res.ok });
-  } catch {
-    return NextResponse.json({ revoked: false });
-  }
+    if (session) revoked = await revokeGoogleToken(session.refreshToken);
+  } catch { /* Clear the local session even when Google revocation is unavailable. */ }
+  const response = NextResponse.json({ revoked });
+  clearGmailSessionCookie(response);
+  return response;
 }

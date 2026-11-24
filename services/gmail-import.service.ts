@@ -242,24 +242,10 @@ export async function syncGmailTransactions(options: {
   fetchImpl?: typeof fetch;
   recordOrigin?: RecordOrigin;
 }): Promise<GmailSyncResult> {
-  let token = options.accessToken ?? null;
-  if (!token && typeof window !== 'undefined') {
-    const { getInMemoryGmailAccessToken } = await import('@/lib/gmail-auth');
-    token = getInMemoryGmailAccessToken();
-  }
-
-  if (!token) {
-    await markGmailTokenExpired();
-    throw new Error(
-      'Gmail authorization is missing or expired in this session. Please connect or reconnect Gmail first.'
-    );
-  }
-
   const fetchImpl = options.fetchImpl ?? fetch;
   const res = await fetchImpl('/api/gmail/sync', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(options.filters),

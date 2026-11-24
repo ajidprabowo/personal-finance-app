@@ -184,12 +184,7 @@ export function GmailImportView() {
   const handleConnectGmail = async () => {
     setConnecting(true);
     try {
-      const next = await connectGmailAccount();
-      setSession(next);
-      notifySuccess(
-        'Gmail connected',
-        `Authorized read-only access for ${next.connection?.emailAddress ?? 'Gmail'}.`
-      );
+      await connectGmailAccount();
     } catch (error) {
       notifyError('Gmail connection failed', error);
     } finally {

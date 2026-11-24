@@ -9,7 +9,6 @@ import type {
 } from '@/types/gmail-import';
 
 export const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
-export const GOOGLE_REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 
 export class GmailServerError extends Error {
   public readonly status: number;
@@ -31,16 +30,6 @@ export class GmailServerError extends Error {
     this.status = status;
     this.code = code;
   }
-}
-
-export function extractBearerTokenFromHeader(authHeader: string | null): string | null {
-  if (!authHeader) return null;
-  const trimmed = authHeader.trim();
-  const match = trimmed.match(/^Bearer\s+([^\s]+)$/i);
-  if (!match?.[1] || match[1].length < 10) {
-    return null;
-  }
-  return match[1];
 }
 
 function sanitizeQueryToken(input: string): string {
