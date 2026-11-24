@@ -1,0 +1,8 @@
+{
+  "name": "Personal Finance App",
+  "description": "Local-first personal finance application foundation powered by Next.js, TypeScript, and Dexie.js IndexedDB storage.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
