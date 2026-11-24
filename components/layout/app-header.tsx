@@ -4,6 +4,7 @@ import React, { useMemo, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Landmark } from 'lucide-react';
+import { PrivacyModeToggle } from '@/components/layout/privacy-mode-toggle';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useI18n } from '@/hooks/use-i18n';
@@ -103,6 +104,8 @@ export function AppHeader() {
             <p className="text-xs font-medium text-ink">{greetingText}</p>
             <p className="font-mono text-[11px] text-ink-muted tabular-nums">{currentDateText}</p>
           </div>
+
+          <PrivacyModeToggle />
 
           <Link
             href="/profile"

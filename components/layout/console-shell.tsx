@@ -13,6 +13,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { PrivacyModeToggle } from '@/components/layout/privacy-mode-toggle';
 import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useNotifications } from '@/hooks/use-notifications';
 import { APP_CONFIG } from '@/lib/config';
@@ -194,6 +195,7 @@ export function ConsoleShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
+            <PrivacyModeToggle dark />
             <button
               type="button"
               onClick={() => void handleQuickExport()}

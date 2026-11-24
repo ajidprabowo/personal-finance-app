@@ -125,6 +125,7 @@ describe('Stage 7 — Profile & Settings Refinement Engine & v7 Migration', () =
       dateFormat: 'MM/DD/YYYY',
       firstDayOfWeek: 'sunday',
       timezone: 'Asia/Singapore',
+      privacyMode: true,
     });
 
     assert.equal(updatedPrefs.themePreference, 'dark');
@@ -134,6 +135,11 @@ describe('Stage 7 — Profile & Settings Refinement Engine & v7 Migration', () =
     assert.equal(updatedPrefs.dateFormat, 'MM/DD/YYYY');
     assert.equal(updatedPrefs.firstDayOfWeek, 'sunday');
     assert.equal(updatedPrefs.timezone, 'Asia/Singapore');
+    assert.equal(updatedPrefs.privacyMode, true);
+
+    resetDatabaseInstance();
+    const reopenedPreferences = (await initializeApplication()).preferences;
+    assert.equal(reopenedPreferences.privacyMode, true, 'privacy preference survives database reopen');
 
     assert.equal(formatDisplayDate('2026-11-24', 'MM/DD/YYYY'), '11/24/2026');
     // 2026-11-25 is Wednesday: Sunday start -> 2026-11-22; Monday start -> 2026-11-23

@@ -88,6 +88,7 @@ async function runBootstrapSequence(): Promise<BootstrapResult> {
           profileEmail: existingPrefs.profileEmail ?? '',
           profileAvatar: existingPrefs.profileAvatar ?? '',
           profileDescription: existingPrefs.profileDescription ?? '',
+          privacyMode: existingPrefs.privacyMode ?? false,
           lastBackupAt: existingPrefs.lastBackupAt,
           budgetAlertPreferences: existingPrefs.budgetAlertPreferences ?? {
             nearLimitThresholdPct: 80,
@@ -114,6 +115,7 @@ async function runBootstrapSequence(): Promise<BootstrapResult> {
           profileEmail: '',
           profileAvatar: '',
           profileDescription: '',
+          privacyMode: false,
           budgetAlertPreferences: {
             nearLimitThresholdPct: 80,
             overBudgetThresholdPct: 100,

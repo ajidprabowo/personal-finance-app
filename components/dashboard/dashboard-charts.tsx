@@ -17,6 +17,11 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/currency';
 import { formatDisplayDate } from '@/lib/dates';
+import {
+  formatCompactFinancialAxis,
+  formatSensitiveNumber,
+  formatSensitiveSignedNumber,
+} from '@/lib/privacy-mode';
 import { cn } from '@/lib/utils';
 import type {
   DashboardAssetAllocationItem,
@@ -87,9 +92,7 @@ export function NetWorthTrendChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -166,9 +169,7 @@ export function IncomeVsExpenseChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -279,7 +280,7 @@ export function AssetAllocationBreakdownChart({
                 {formatCurrency(item.value, item.currency, numberFormat)}
               </p>
               <p className="font-mono text-[11px] text-ink-muted">
-                {item.percentage.toFixed(1)}%
+                {formatSensitiveNumber(item.percentage, 1)}%
               </p>
             </div>
           </div>
@@ -322,9 +323,7 @@ export function ExpenseBreakdownChart({
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
             <XAxis
               type="number"
-              tickFormatter={(v: number) =>
-                new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-              }
+              tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
               tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
               axisLine={false}
               tickLine={false}
@@ -365,7 +364,7 @@ export function ExpenseBreakdownChart({
             <div className="min-w-0">
               <p className="truncate font-medium text-ink">{item.categoryName}</p>
               <p className="text-[11px] tabular-nums text-ink-muted">
-                {item.percentageOfTotal.toFixed(1)}% of expenses · {item.transactionCount} tx
+                {formatSensitiveNumber(item.percentageOfTotal, 1)}% of expenses · {item.transactionCount} tx
                 {item.percentageChange !== null ? (
                   <span
                     className={cn(
@@ -378,7 +377,7 @@ export function ExpenseBreakdownChart({
                     )}
                   >
                     ({item.percentageChange > 0 ? '+' : ''}
-                    {item.percentageChange.toFixed(1)}% vs prior)
+                    {formatSensitiveSignedNumber(item.percentageChange, 1)}% vs prior)
                   </span>
                 ) : null}
               </p>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useId } from 'react';
+import { useBootstrap } from '@/hooks/use-bootstrap';
 import { cn } from '@/lib/utils';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -19,6 +20,8 @@ export function Input({
 }: InputProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
+  const { privacyModeEnabled } = useBootstrap();
+  const maskValue = privacyModeEnabled && props.type === 'number';
 
   return (
     <div className="w-full">
@@ -35,6 +38,8 @@ export function Input({
           className
         )}
         {...props}
+        type={maskValue ? 'password' : props.type}
+        inputMode={maskValue ? 'decimal' : props.inputMode}
       />
       {error ? (
         <p className="mt-1 text-xs text-status-danger">{error}</p>

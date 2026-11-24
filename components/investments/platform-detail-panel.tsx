@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatCurrency, formatNumericValue } from '@/lib/currency';
+import { formatSensitiveNumber, formatSensitiveSignedNumber } from '@/lib/privacy-mode';
 import { formatDisplayDate } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import type { HoldingEnriched } from '@/services/holding.service';
@@ -156,7 +157,9 @@ export function PlatformDetailPanel({
           >
             {summary.unrealizedPnl > 0 ? '+' : ''}
             {formatCurrency(summary.unrealizedPnl, currency, numberFormat)}
-            {summary.unrealizedPnlPct !== null ? ` (${summary.unrealizedPnlPct.toFixed(2)}%)` : ''}
+            {summary.unrealizedPnlPct !== null
+              ? ` (${formatSensitiveSignedNumber(summary.unrealizedPnlPct, 2)}%)`
+              : ''}
           </p>
           <p className="mt-0.5 text-xs tabular-nums text-ink-muted">
             Realized: {formatCurrency(summary.realizedPnlTotal, currency, numberFormat)}
@@ -178,7 +181,7 @@ export function PlatformDetailPanel({
                   <div>
                     <p className="font-medium text-ink">{slice.assetClassName}</p>
                     <p className="font-mono tabular-nums text-ink-muted">
-                      {slice.percentage.toFixed(1)}%
+                      {formatSensitiveNumber(slice.percentage, 1)}%
                     </p>
                   </div>
                   <div className="text-right tabular-nums">

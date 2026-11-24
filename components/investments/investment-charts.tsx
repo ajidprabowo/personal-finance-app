@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/currency';
 import { formatDisplayDate } from '@/lib/dates';
+import { formatCompactFinancialAxis, formatSensitiveNumber } from '@/lib/privacy-mode';
 import type { DateFormatPreference, NumberFormatPreference } from '@/types/entities';
 
 const CHART_COLORS = [
@@ -98,7 +99,7 @@ export function AssetAllocationChart({
               />
               <span className="truncate font-medium text-ink">{row.name}</span>
               <span className="font-mono tabular-nums text-ink-muted">
-                {row.percentage.toFixed(1)}%
+                {formatSensitiveNumber(row.percentage, 1)}%
               </span>
             </div>
             <div className="shrink-0 text-right tabular-nums">
@@ -165,9 +166,7 @@ export function PerformanceHistoryChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}

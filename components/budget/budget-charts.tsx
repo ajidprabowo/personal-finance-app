@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatCurrency } from '@/lib/currency';
+import { formatCompactFinancialAxis, formatSensitiveNumber } from '@/lib/privacy-mode';
 import type { ComputedBudgetItem } from '@/services/budget-calculation.service';
 import type { BudgetMonthHistoryItem } from '@/services/budget.service';
 import type { NumberFormatPreference } from '@/types/entities';
@@ -58,9 +59,7 @@ export function BudgetVsActualComparisonChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -82,7 +81,9 @@ export function BudgetVsActualComparisonChart({
                   </p>
                   <p className="mt-0.5 text-[11px] font-medium text-brand-primary">
                     Utilization:{' '}
-                    {row.utilizationPct !== null ? `${row.utilizationPct.toFixed(1)}%` : 'Over limit'}
+                    {row.utilizationPct !== null
+                      ? `${formatSensitiveNumber(row.utilizationPct, 1)}%`
+                      : 'Over limit'}
                   </p>
                 </div>
               );
@@ -142,9 +143,7 @@ export function BudgetHistoryTrendChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}

@@ -42,6 +42,11 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { APP_CONFIG } from '@/lib/config';
 import { formatCurrency, formatNumericValue } from '@/lib/currency';
 import {
+  formatPrivacySensitiveText,
+  formatSensitiveNumber,
+  formatSensitiveSignedNumber,
+} from '@/lib/privacy-mode';
+import {
   formatDisplayDate,
   formatTimestamp,
   type ReportingPeriodPreset,
@@ -160,7 +165,7 @@ function ComparisonLine({
     >
       {absChange > 0 ? '+' : ''}
       {formatCurrency(absChange, currency, numberFormat)}
-      {pctChange !== null ? ` (${pctChange > 0 ? '+' : ''}${pctChange.toFixed(1)}%)` : ''} vs prior
+      {pctChange !== null ? ` (${formatSensitiveSignedNumber(pctChange, 1)}%)` : ''} vs prior
     </p>
   );
 }
@@ -730,7 +735,7 @@ export function DashboardView() {
                   </p>
                   <p className="mt-1 text-[11px] tabular-nums text-ink-muted">
                     {snapshot.metrics.savingsRatePct !== null
-                      ? `Savings Rate: ${snapshot.metrics.savingsRatePct.toFixed(1)}% of income`
+                      ? `Savings Rate: ${formatSensitiveNumber(snapshot.metrics.savingsRatePct, 1)}% of income`
                       : 'Savings Rate unavailable (no income in period)'}
                   </p>
                 </Card>
@@ -1001,8 +1006,7 @@ export function DashboardView() {
                       <p className="text-xs tabular-nums text-ink-muted">
                         Simple Return on Net Contributions:{' '}
                         <strong className="text-ink">
-                          {investmentDisplayMetrics.simpleReturnPct > 0 ? '+' : ''}
-                          {investmentDisplayMetrics.simpleReturnPct.toFixed(2)}%
+                          {formatSensitiveSignedNumber(investmentDisplayMetrics.simpleReturnPct, 2)}%
                         </strong>
                       </p>
                     ) : null}
@@ -1281,9 +1285,11 @@ export function DashboardView() {
                               : 'border-line bg-surface-muted/40'
                         )}
                       >
-                        <p className="font-semibold text-ink">{insight.title}</p>
+                        <p className="font-semibold text-ink">
+                          {formatPrivacySensitiveText(insight.title)}
+                        </p>
                         <p className="mt-0.5 leading-relaxed text-ink-muted">
-                          {insight.description}
+                          {formatPrivacySensitiveText(insight.description)}
                         </p>
                       </div>
                     ))}

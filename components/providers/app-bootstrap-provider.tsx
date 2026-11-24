@@ -3,7 +3,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { normalizeErrorMessage } from '@/lib/errors';
+import { getPrivacyModeSnapshot, setPrivacyModeSnapshot } from '@/lib/privacy-mode';
 import { initializeApplication } from '@/services/bootstrap.service';
+import { updateUserPreferences } from '@/services/settings.service';
 import type { AppInstallation, UserPreferences } from '@/types/entities';
 
 export type BootstrapStatus = 'loading' | 'ready' | 'error';
@@ -16,6 +18,7 @@ interface BootstrapContextValue {
   isFirstLaunch: boolean;
   errorMessage: string | null;
   refreshBootstrap: () => Promise<void>;
+  setPrivacyModeEnabled: (enabled: boolean) => Promise<void>;
 }
 
 const BootstrapContext = createContext<BootstrapContextValue | null>(null);
@@ -28,6 +31,24 @@ export function AppBootstrapProvider({ children }: { children: React.ReactNode }
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const setPrivacyModeEnabled = useCallback(
+    async (enabled: boolean) => {
+      const previous = getPrivacyModeSnapshot();
+      setPrivacyModeSnapshot(enabled);
+      setPreferences((current) => (current ? { ...current, privacyMode: enabled } : current));
+      if (!installation) return;
+
+      try {
+        await updateUserPreferences(installation.installationId, { privacyMode: enabled });
+      } catch (error) {
+        setPrivacyModeSnapshot(previous);
+        setPreferences((current) => (current ? { ...current, privacyMode: previous } : current));
+        throw error;
+      }
+    },
+    [installation]
+  );
+
   const runInit = useCallback(async (showLoadingState = true) => {
     if (showLoadingState) {
       setStatus('loading');
@@ -35,6 +56,7 @@ export function AppBootstrapProvider({ children }: { children: React.ReactNode }
     }
     try {
       const result = await initializeApplication();
+      setPrivacyModeSnapshot(Boolean(result.preferences.privacyMode));
       setInstallation(result.installation);
       setPreferences(result.preferences);
       setSchemaVersion(result.schemaVersion);
@@ -52,6 +74,7 @@ export function AppBootstrapProvider({ children }: { children: React.ReactNode }
     initializeApplication()
       .then((result) => {
         if (!active) return;
+        setPrivacyModeSnapshot(Boolean(result.preferences.privacyMode));
         setInstallation(result.installation);
         setPreferences(result.preferences);
         setSchemaVersion(result.schemaVersion);
@@ -78,8 +101,18 @@ export function AppBootstrapProvider({ children }: { children: React.ReactNode }
       isFirstLaunch,
       errorMessage,
       refreshBootstrap: runInit,
+      setPrivacyModeEnabled,
     }),
-    [status, installation, preferences, schemaVersion, isFirstLaunch, errorMessage, runInit]
+    [
+      status,
+      installation,
+      preferences,
+      schemaVersion,
+      isFirstLaunch,
+      errorMessage,
+      runInit,
+      setPrivacyModeEnabled,
+    ]
   );
 
   if (status === 'error') {

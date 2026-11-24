@@ -51,6 +51,7 @@ export type PreferencesUpdateInput = Partial<
     | 'firstDayOfWeek'
     | 'language'
     | 'timezone'
+    | 'privacyMode'
   >
 >;
 

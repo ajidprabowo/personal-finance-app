@@ -1,5 +1,6 @@
 import { APP_CONFIG } from '@/lib/config';
 import { roundToDecimals } from '@/lib/precision';
+import { getPrivacyModeSnapshot, PRIVACY_MASK } from '@/lib/privacy-mode';
 
 const ZERO_DECIMAL_CURRENCIES = new Set(['IDR', 'JPY', 'KRW', 'VND']);
 const NON_ISO_CURRENCIES = new Set(['USDT', 'USDC', 'BUSD', 'DAI', 'BTC', 'ETH', 'SOL']);
@@ -41,6 +42,26 @@ export function formatCurrency(
   const safeAmount = Number.isFinite(amount) ? amount : 0;
   const code = (currency || APP_CONFIG.defaultCurrency).toUpperCase();
   const decimals = getCurrencyDecimals(code);
+
+  if (getPrivacyModeSnapshot()) {
+    if (NON_ISO_CURRENCIES.has(code)) return `${PRIVACY_MASK} ${code}`;
+    try {
+      let maskedValueAdded = false;
+      return getCurrencyFormatter(code, locale)
+        .formatToParts(0)
+        .map((part) => {
+          if (['integer', 'group', 'decimal', 'fraction'].includes(part.type)) {
+            if (maskedValueAdded) return '';
+            maskedValueAdded = true;
+            return PRIVACY_MASK;
+          }
+          return part.value;
+        })
+        .join('');
+    } catch {
+      return `${code} ${PRIVACY_MASK}`;
+    }
+  }
 
   if (NON_ISO_CURRENCIES.has(code)) {
     const formattedNumber = new Intl.NumberFormat(locale, {

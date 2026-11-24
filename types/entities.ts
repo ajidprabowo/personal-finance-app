@@ -70,6 +70,7 @@ export interface UserPreferences extends BaseEntity {
   profileEmail: string;
   profileAvatar: string;
   profileDescription?: string;
+  privacyMode?: boolean;
   lastBackupAt?: string;
   manualFxRates?: ManualFxRateEntry[];
   budgetAlertPreferences?: BudgetAlertPreferences;

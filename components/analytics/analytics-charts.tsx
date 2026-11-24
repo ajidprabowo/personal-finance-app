@@ -18,6 +18,10 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/currency';
 import { formatDisplayDate } from '@/lib/dates';
+import {
+  formatCompactFinancialAxis,
+  formatSensitiveNumber,
+} from '@/lib/privacy-mode';
 import type { NetWorthTrendResult } from '@/services/dashboard-chart.service';
 import type {
   ExpenseCategoryBreakdownItem,
@@ -71,9 +75,7 @@ export function IncomeTrendChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -161,7 +163,7 @@ export function ExpenseCategoryDonutChart({
                   <p className="font-semibold text-ink">{item.categoryName}</p>
                   <p className="mt-1 font-mono font-semibold text-ink">
                     {formatCurrency(item.amount, currency, numberFormat)} (
-                    {item.percentageOfTotal.toFixed(1)}%)
+                    {formatSensitiveNumber(item.percentageOfTotal, 1)}%)
                   </p>
                   <p className="text-[11px] text-ink-muted">
                     {item.transactionCount} transaction{item.transactionCount === 1 ? '' : 's'}
@@ -205,9 +207,7 @@ export function ExpenseTrendSeriesChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -273,9 +273,7 @@ export function ExpenseCategoryHorizontalChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
           <XAxis
             type="number"
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -300,7 +298,7 @@ export function ExpenseCategoryHorizontalChart({
                     {formatCurrency(row.amount, currency, numberFormat)}
                   </p>
                   <p className="text-[11px] text-ink-muted">
-                    {row.percentageOfTotal.toFixed(1)}% of period expenses
+                    {formatSensitiveNumber(row.percentageOfTotal, 1)}% of period expenses
                   </p>
                 </div>
               );
@@ -342,9 +340,7 @@ export function SavingsMonthlyTrendChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -368,7 +364,9 @@ export function SavingsMonthlyTrendChart({
                   </p>
                   <p className="mt-0.5 border-t border-line pt-1 font-mono font-semibold text-ink">
                     Savings: {formatCurrency(pt.savings, currency, numberFormat)}
-                    {pt.savingsRatePct !== null ? ` (${pt.savingsRatePct.toFixed(1)}%)` : ''}
+                    {pt.savingsRatePct !== null
+                      ? ` (${formatSensitiveNumber(pt.savingsRatePct, 1)}%)`
+                      : ''}
                   </p>
                 </div>
               );
@@ -425,9 +423,7 @@ export function InvestmentActivityHistoryChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -512,9 +508,7 @@ export function InvestmentValueHistoryChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}
@@ -591,9 +585,7 @@ export function NetWorthAnalyticsTrendChart({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={(v: number) =>
-              new Intl.NumberFormat(numberFormat, { notation: 'compact' }).format(v)
-            }
+            tickFormatter={(v: number) => formatCompactFinancialAxis(v, numberFormat)}
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             axisLine={false}
             tickLine={false}

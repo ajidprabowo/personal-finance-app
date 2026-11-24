@@ -47,6 +47,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useNotifications } from '@/hooks/use-notifications';
 import { APP_CONFIG } from '@/lib/config';
 import { formatCurrency, formatNumericValue } from '@/lib/currency';
+import { formatSensitiveSignedNumber } from '@/lib/privacy-mode';
 import { formatDisplayDate } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import {
@@ -638,7 +639,7 @@ export function InvestmentsView() {
                     </p>
                     <p className="mt-1 text-[11px] tabular-nums text-ink-muted">
                       {activeOverviewKpis.unrealizedPnlPct !== null
-                        ? `${activeOverviewKpis.unrealizedPnlPct > 0 ? '+' : ''}${activeOverviewKpis.unrealizedPnlPct.toFixed(2)}% vs remaining cost basis`
+                        ? `${formatSensitiveSignedNumber(activeOverviewKpis.unrealizedPnlPct, 2)}% vs remaining cost basis`
                         : 'No open cost basis yet'}
                     </p>
                   </Card>
@@ -693,7 +694,7 @@ export function InvestmentsView() {
                       <span className="text-ink-muted">Simple Return on Net Contributions</span>
                       <p className="mt-0.5 font-semibold tabular-nums text-ink">
                         {activeOverviewKpis.simpleReturnPct !== null
-                          ? `${activeOverviewKpis.simpleReturnPct > 0 ? '+' : ''}${activeOverviewKpis.simpleReturnPct.toFixed(2)}%`
+                          ? `${formatSensitiveSignedNumber(activeOverviewKpis.simpleReturnPct, 2)}%`
                           : '— (Requires Net Contributions > 0)'}
                       </p>
                     </div>
@@ -1413,8 +1414,7 @@ export function InvestmentsView() {
                             </p>
                             {h.priceRecorded && h.unrealizedPnlPct !== null ? (
                               <p className="text-[11px]">
-                                {h.unrealizedPnlPct > 0 ? '+' : ''}
-                                {h.unrealizedPnlPct.toFixed(2)}%
+                                {formatSensitiveSignedNumber(h.unrealizedPnlPct, 2)}%
                               </p>
                             ) : null}
                           </td>

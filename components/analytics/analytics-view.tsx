@@ -42,6 +42,11 @@ import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useI18n } from '@/hooks/use-i18n';
 import { APP_CONFIG } from '@/lib/config';
 import { formatCurrency } from '@/lib/currency';
+import {
+  formatPrivacySensitiveText,
+  formatSensitiveNumber,
+  formatSensitiveSignedNumber,
+} from '@/lib/privacy-mode';
 import { formatDisplayDate, type ReportingPeriodPreset } from '@/lib/dates';
 import { normalizeErrorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
@@ -486,7 +491,7 @@ export function AnalyticsView() {
                   <p className="mt-1 text-[11px] text-ink-muted">
                     Savings rate:{' '}
                     {snapshot.overview.savingsRatePct !== null
-                      ? `${snapshot.overview.savingsRatePct.toFixed(1)}%`
+                      ? `${formatSensitiveNumber(snapshot.overview.savingsRatePct, 1)}%`
                       : 'Unavailable (0 income)'}
                   </p>
                 </Card>
@@ -509,8 +514,8 @@ export function AnalyticsView() {
                   </p>
                   <p className="mt-1 text-[11px] text-ink-muted">
                     {snapshot.netWorth.cashSharePct !== null
-                      ? `${snapshot.netWorth.cashSharePct.toFixed(0)}% Cash · ${
-                          snapshot.netWorth.investmentSharePct?.toFixed(0) ?? 0
+                      ? `${formatSensitiveNumber(snapshot.netWorth.cashSharePct, 0)}% Cash · ${
+                          formatSensitiveNumber(snapshot.netWorth.investmentSharePct ?? 0, 0)
                         }% Inv`
                       : 'Assets only'}
                   </p>
@@ -559,9 +564,7 @@ export function AnalyticsView() {
                         <p className="text-ink-muted">Period Growth vs. Prior</p>
                         <p className="mt-1 font-mono text-base font-bold text-ink">
                           {snapshot.income.incomeChangePct !== null
-                            ? `${snapshot.income.incomeChangePct >= 0 ? '+' : ''}${snapshot.income.incomeChangePct.toFixed(
-                                1
-                              )}%`
+                            ? `${formatSensitiveSignedNumber(snapshot.income.incomeChangePct, 1)}%`
                             : '—'}
                         </p>
                         <p className="mt-0.5 text-ink-muted">
@@ -619,7 +622,7 @@ export function AnalyticsView() {
                                   <span className="truncate text-ink">{c.categoryName}</span>
                                   <span className="font-mono tabular-nums text-ink-muted">
                                     {formatCurrency(c.amount, baseCurrency, numberFormat)} (
-                                    {c.percentageOfTotal.toFixed(0)}%)
+                                    {formatSensitiveNumber(c.percentageOfTotal, 0)}%)
                                   </span>
                                 </li>
                               ))}
@@ -752,11 +755,9 @@ export function AnalyticsView() {
                                 <div>
                                   <p className="font-semibold text-ink">{cat.categoryName}</p>
                                   <p className="text-[11px] text-ink-muted">
-                                    {cat.transactionCount} tx · {cat.percentageOfTotal.toFixed(1)}%
+                                    {cat.transactionCount} tx · {formatSensitiveNumber(cat.percentageOfTotal, 1)}%
                                     {cat.percentageChange !== null
-                                      ? ` · ${cat.percentageChange > 0 ? '+' : ''}${cat.percentageChange.toFixed(
-                                          1
-                                        )}% vs prior`
+                                      ? ` · ${formatSensitiveSignedNumber(cat.percentageChange, 1)}% vs prior`
                                       : ''}
                                   </p>
                                 </div>
@@ -847,13 +848,13 @@ export function AnalyticsView() {
                         <p className="text-ink-muted">Category Concentration</p>
                         <p className="mt-1 font-mono text-base font-bold text-ink">
                           {snapshot.spendingBehavior.topCategoryConcentrationPct !== null
-                            ? `${snapshot.spendingBehavior.topCategoryConcentrationPct.toFixed(1)}%`
+                            ? `${formatSensitiveNumber(snapshot.spendingBehavior.topCategoryConcentrationPct, 1)}%`
                             : '—'}
                         </p>
                         <p className="mt-0.5 text-ink-muted">
                           Top 3 share:{' '}
                           {snapshot.spendingBehavior.top3CategoryConcentrationPct !== null
-                            ? `${snapshot.spendingBehavior.top3CategoryConcentrationPct.toFixed(1)}%`
+                            ? `${formatSensitiveNumber(snapshot.spendingBehavior.top3CategoryConcentrationPct, 1)}%`
                             : '—'}
                         </p>
                       </div>
@@ -876,7 +877,7 @@ export function AnalyticsView() {
                               )}
                             </p>
                             <p className="text-[11px] text-ink-muted">
-                              {snapshot.spendingBehavior.weekdayVsWeekend.weekdaySharePct.toFixed(1)}
+                              {formatSensitiveNumber(snapshot.spendingBehavior.weekdayVsWeekend.weekdaySharePct, 1)}
                               % of spending
                             </p>
                           </div>
@@ -893,7 +894,7 @@ export function AnalyticsView() {
                               )}
                             </p>
                             <p className="text-[11px] text-ink-muted">
-                              {snapshot.spendingBehavior.weekdayVsWeekend.weekendSharePct.toFixed(1)}
+                              {formatSensitiveNumber(snapshot.spendingBehavior.weekdayVsWeekend.weekendSharePct, 1)}
                               % of spending
                             </p>
                           </div>
@@ -962,7 +963,7 @@ export function AnalyticsView() {
                         <p className="text-ink-muted">Savings Rate</p>
                         <p className="mt-1 font-mono text-base font-bold text-ink">
                           {snapshot.savings.savingsRatePct !== null
-                            ? `${snapshot.savings.savingsRatePct.toFixed(1)}%`
+                            ? `${formatSensitiveNumber(snapshot.savings.savingsRatePct, 1)}%`
                             : 'Unavailable (0 income)'}
                         </p>
                       </div>
@@ -970,7 +971,7 @@ export function AnalyticsView() {
                         <p className="text-ink-muted">Expense-to-Income Ratio</p>
                         <p className="mt-1 font-mono text-base font-bold text-ink">
                           {snapshot.savings.expenseToIncomeRatioPct !== null
-                            ? `${snapshot.savings.expenseToIncomeRatioPct.toFixed(1)}%`
+                            ? `${formatSensitiveNumber(snapshot.savings.expenseToIncomeRatioPct, 1)}%`
                             : 'Unavailable (0 income)'}
                         </p>
                       </div>
@@ -1074,7 +1075,7 @@ export function AnalyticsView() {
                         </p>
                         <p className="mt-0.5 text-ink-muted">
                           {snapshot.investments.unrealizedPnlPct !== null
-                            ? `${snapshot.investments.unrealizedPnlPct.toFixed(1)}% on cost basis`
+                            ? `${formatSensitiveSignedNumber(snapshot.investments.unrealizedPnlPct, 1)}% on cost basis`
                             : 'No cost basis'}
                         </p>
                       </div>
@@ -1146,7 +1147,7 @@ export function AnalyticsView() {
                                       {formatCurrency(ac.marketValue, baseCurrency, numberFormat)}
                                     </td>
                                     <td className="py-2 pr-3 font-mono tabular-nums text-ink-muted">
-                                      {ac.allocationPct.toFixed(1)}%
+                                      {formatSensitiveNumber(ac.allocationPct, 1)}%
                                     </td>
                                     <td
                                       className={cn(
@@ -1198,7 +1199,7 @@ export function AnalyticsView() {
                                       )}
                                     </td>
                                     <td className="py-2 pr-3 font-mono tabular-nums text-ink-muted">
-                                      {p.allocationPct.toFixed(1)}%
+                                      {formatSensitiveNumber(p.allocationPct, 1)}%
                                     </td>
                                     <td
                                       className={cn(
@@ -1313,7 +1314,7 @@ export function AnalyticsView() {
                                   </span>
                                 </div>
                                 <p className="mt-0.5 text-[11px] text-ink-muted">
-                                  {item.percentage.toFixed(1)}% · {item.detail}
+                                  {formatSensitiveNumber(item.percentage, 1)}% · {item.detail}
                                 </p>
                               </div>
                             ))}
@@ -1361,9 +1362,11 @@ export function AnalyticsView() {
                                 </span>
                               </div>
                               <p className="mt-2 font-mono text-lg font-bold text-ink">
-                                {ind.formattedValue}
+                                {formatPrivacySensitiveText(ind.formattedValue)}
                               </p>
-                              <p className="mt-1 text-ink-muted">{ind.dataSummary}</p>
+                              <p className="mt-1 text-ink-muted">
+                                {formatPrivacySensitiveText(ind.dataSummary)}
+                              </p>
                             </div>
                             <div className="mt-3 border-t border-line pt-2 text-[11px] text-ink-muted">
                               <p>Formula: {ind.formula}</p>
@@ -1415,9 +1418,11 @@ export function AnalyticsView() {
                                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-primary" />
                               )}
                               <div>
-                                <p className="font-semibold text-ink">{ins.title}</p>
+                                <p className="font-semibold text-ink">
+                                  {formatPrivacySensitiveText(ins.title)}
+                                </p>
                                 <p className="mt-1 leading-relaxed text-ink-muted">
-                                  {ins.description}
+                                  {formatPrivacySensitiveText(ins.description)}
                                 </p>
                               </div>
                             </div>

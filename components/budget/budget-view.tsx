@@ -49,6 +49,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useNotifications } from '@/hooks/use-notifications';
 import { APP_CONFIG } from '@/lib/config';
 import { formatCurrency } from '@/lib/currency';
+import { formatSensitiveNumber, formatSensitiveSignedNumber } from '@/lib/privacy-mode';
 import { getTodayInTimezone } from '@/lib/dates';
 import { normalizeErrorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
@@ -546,7 +547,7 @@ export function BudgetView() {
                                       numberFormat
                                     )}
                                   </span>{' '}
-                                  ({alert.utilizationPct.toFixed(1)}%)
+                                  ({formatSensitiveNumber(alert.utilizationPct, 1)}%)
                                 </p>
                               </div>
                             </div>
@@ -576,7 +577,7 @@ export function BudgetView() {
                           className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface-muted/50 px-3 py-2 text-xs text-ink-muted"
                         >
                           <span>
-                            {alert.categoryNameSnapshot} ({alert.utilizationPct.toFixed(1)}% ·{' '}
+                            {alert.categoryNameSnapshot} ({formatSensitiveNumber(alert.utilizationPct, 1)}% ·{' '}
                             {alert.thresholdType.replaceAll('_', ' ')})
                           </span>
                           <button
@@ -670,7 +671,7 @@ export function BudgetView() {
                     )}
                   >
                     {snapshot.summary.utilizationPct !== null
-                      ? `${snapshot.summary.utilizationPct.toFixed(1)}%`
+                      ? `${formatSensitiveNumber(snapshot.summary.utilizationPct, 1)}%`
                       : '—'}
                   </p>
                   <p className="mt-1 text-[11px] text-ink-muted">
@@ -1010,7 +1011,7 @@ export function BudgetView() {
                                       )} remaining`}
                                   {' · '}
                                   {item.utilizationPct !== null
-                                    ? `${item.utilizationPct.toFixed(1)}%`
+                                    ? `${formatSensitiveNumber(item.utilizationPct, 1)}%`
                                     : 'No budget limit'}
                                 </p>
                               </div>
@@ -1238,7 +1239,9 @@ export function BudgetView() {
                               {formatCurrency(row.totalAllMonthExpenses, baseCurrency, numberFormat)}
                             </td>
                             <td className="py-2.5 pr-4 font-mono tabular-nums text-ink">
-                              {row.utilizationPct !== null ? `${row.utilizationPct.toFixed(1)}%` : '—'}
+                              {row.utilizationPct !== null
+                                ? `${formatSensitiveNumber(row.utilizationPct, 1)}%`
+                                : '—'}
                             </td>
                             <td className="py-2.5">
                               {row.overBudgetCount > 0 ? (
@@ -1315,7 +1318,7 @@ export function BudgetView() {
                                 numberFormat
                               )}
                               {snapshot.monthComparison.actualChangePct !== null
-                                ? ` (${snapshot.monthComparison.actualChangePct.toFixed(1)}%)`
+                                ? ` (${formatSensitiveSignedNumber(snapshot.monthComparison.actualChangePct, 1)}%)`
                                 : ''}
                             </span>
                           ) : (
@@ -1371,7 +1374,7 @@ export function BudgetView() {
                                   {v.actualDelta >= 0 ? '+' : ''}
                                   {formatCurrency(v.actualDelta, v.currency, numberFormat)}
                                   {v.actualDeltaPct !== null
-                                    ? ` (${v.actualDeltaPct.toFixed(1)}%)`
+                                    ? ` (${formatSensitiveSignedNumber(v.actualDeltaPct, 1)}%)`
                                     : ''}
                                 </td>
                                 <td className="py-2 font-mono tabular-nums text-ink-muted">
@@ -1431,7 +1434,7 @@ export function BudgetView() {
                                     )}
                                   >
                                     {m.utilizationPct !== null
-                                      ? `${m.utilizationPct.toFixed(1)}% used`
+                                      ? `${formatSensitiveNumber(m.utilizationPct, 1)}% used`
                                       : 'Over limit'}
                                   </p>
                                 </div>

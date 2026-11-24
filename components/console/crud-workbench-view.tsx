@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatCurrency } from '@/lib/currency';
 import { formatTimestamp, todayDateString } from '@/lib/dates';
@@ -38,6 +39,7 @@ import type {
 type ActiveEntityTab = 'accounts' | 'categories' | 'transactions';
 
 export function CrudWorkbenchView() {
+  const { privacyModeEnabled } = useBootstrap();
   const { confirm } = useConfirmDialog();
   const { notifySuccess, notifyError, notifyInfo } = useNotifications();
 
@@ -374,7 +376,8 @@ export function CrudWorkbenchView() {
               <div className="mt-1.5 flex gap-2">
                 <input
                   id="test-account-balance"
-                  type="number"
+                  type={privacyModeEnabled ? 'password' : 'number'}
+                  inputMode={privacyModeEnabled ? 'decimal' : undefined}
                   value={accountBalance}
                   onChange={(e) => setAccountBalance(e.target.value)}
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 tabular-nums focus:border-slate-900 focus:outline-none"
@@ -437,7 +440,8 @@ export function CrudWorkbenchView() {
                         <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-900 tabular-nums">
                           {isEditing ? (
                             <input
-                              type="number"
+                              type={privacyModeEnabled ? 'password' : 'number'}
+                              inputMode={privacyModeEnabled ? 'decimal' : undefined}
                               value={editAmountText}
                               onChange={(e) => setEditAmountText(e.target.value)}
                               className="w-32 rounded border border-slate-300 px-2 py-1 text-right font-mono text-xs"
@@ -715,7 +719,8 @@ export function CrudWorkbenchView() {
               </label>
               <input
                 id="test-tx-amount"
-                type="number"
+                type={privacyModeEnabled ? 'password' : 'number'}
+                inputMode={privacyModeEnabled ? 'decimal' : undefined}
                 min={1}
                 required
                 value={txAmount}
@@ -824,7 +829,8 @@ export function CrudWorkbenchView() {
                         <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-900 tabular-nums">
                           {isEditing ? (
                             <input
-                              type="number"
+                              type={privacyModeEnabled ? 'password' : 'number'}
+                              inputMode={privacyModeEnabled ? 'decimal' : undefined}
                               value={editAmountText}
                               onChange={(e) => setEditAmountText(e.target.value)}
                               className="w-32 rounded border border-slate-300 px-2 py-1 text-right font-mono text-xs"
