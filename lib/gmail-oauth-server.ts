@@ -9,6 +9,13 @@ const GOOGLE_TOKEN_INFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 180;
 const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
+export class GmailSessionPersistenceError extends Error {
+  constructor(public readonly code: string) {
+    super(code);
+    this.name = 'GmailSessionPersistenceError';
+  }
+}
+
 interface GmailSession {
   refreshToken: string;
   emailAddress: string;
@@ -51,9 +58,18 @@ export function gmailImportReturnUrl(status: 'connected' | 'error'): URL {
 }
 
 function encryptionKey(): Buffer {
-  const key = Buffer.from(requiredEnv('GMAIL_TOKEN_ENCRYPTION_KEY'), 'base64');
+  let value: string;
+  try {
+    value = requiredEnv('GMAIL_TOKEN_ENCRYPTION_KEY');
+  } catch {
+    throw new GmailSessionPersistenceError('encryption_key_missing');
+  }
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw new GmailSessionPersistenceError('encryption_key_invalid_base64');
+  }
+  const key = Buffer.from(value, 'base64');
   if (key.length !== 32) {
-    throw new Error('GMAIL_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.');
+    throw new GmailSessionPersistenceError('encryption_key_wrong_length');
   }
   return key;
 }
@@ -65,17 +81,23 @@ function cookieOptions(maxAge: number) {
     sameSite: 'lax' as const,
     path: '/',
     maxAge,
+    expires: new Date(Date.now() + maxAge * 1000),
   };
 }
 
 function encryptSession(session: GmailSession): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv);
-  const encrypted = Buffer.concat([
-    cipher.update(JSON.stringify(session), 'utf8'),
-    cipher.final(),
-  ]);
-  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
+  try {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv);
+    const encrypted = Buffer.concat([
+      cipher.update(JSON.stringify(session), 'utf8'),
+      cipher.final(),
+    ]);
+    return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString('base64url');
+  } catch (error) {
+    if (error instanceof GmailSessionPersistenceError) throw error;
+    throw new GmailSessionPersistenceError('session_encryption_failed');
+  }
 }
 
 function decryptSession(value: string): GmailSession | null {
@@ -125,7 +147,18 @@ export function validateOAuthState(request: NextRequest, returnedState: string |
 }
 
 export function setGmailSessionCookie(response: NextResponse, session: GmailSession): void {
-  response.cookies.set(GMAIL_SESSION_COOKIE, encryptSession(session), cookieOptions(SESSION_MAX_AGE));
+  const value = encryptSession(session);
+  if (value.length > 3800) {
+    throw new GmailSessionPersistenceError('session_cookie_too_large');
+  }
+  try {
+    response.cookies.set(GMAIL_SESSION_COOKIE, value, cookieOptions(SESSION_MAX_AGE));
+  } catch {
+    throw new GmailSessionPersistenceError('session_cookie_serialization_failed');
+  }
+  if (response.cookies.get(GMAIL_SESSION_COOKIE)?.value !== value) {
+    throw new GmailSessionPersistenceError('session_cookie_not_attached_to_response');
+  }
 }
 
 export function clearGmailSessionCookie(response: NextResponse): void {

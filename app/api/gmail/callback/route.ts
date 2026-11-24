@@ -3,6 +3,7 @@ import { fetchGmailProfileServer } from '@/lib/gmail-server';
 import {
   clearOAuthStateCookie,
   exchangeAuthorizationCode,
+  GmailSessionPersistenceError,
   getGmailSession,
   gmailImportReturnUrl,
   setGmailSessionCookie,
@@ -61,11 +62,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[gmail-oauth] callback failed', {
       stage,
-      code:
-        typeof error === 'object' && error !== null && 'code' in error &&
-        typeof (error as { code?: unknown }).code === 'string'
-          ? (error as { code: string }).code
-          : 'oauth_callback_error',
+      code: error instanceof GmailSessionPersistenceError
+        ? error.code
+        : 'oauth_callback_error',
     });
     const response = NextResponse.redirect(gmailImportReturnUrl('error'));
     clearOAuthStateCookie(response);
