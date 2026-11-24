@@ -316,22 +316,11 @@ export function calculateAccountBalances(
 export function resolveHoldingMarketValue(holding: Holding): number {
   const qty = Number.isFinite(holding.quantity) ? Math.max(0, holding.quantity) : 0;
   if (qty <= 0) return 0;
+  if (holding.priceRecorded !== true) return 0;
   if (typeof holding.currentPrice === 'number' && Number.isFinite(holding.currentPrice)) {
     return roundCurrencyAmount(qty * Math.max(0, holding.currentPrice), holding.currency);
   }
-  if (
-    typeof holding.currentMarketValue === 'number' &&
-    Number.isFinite(holding.currentMarketValue)
-  ) {
-    return roundCurrencyAmount(Math.max(0, holding.currentMarketValue), holding.currency);
-  }
-  if (
-    typeof holding.remainingCostBasis === 'number' &&
-    Number.isFinite(holding.remainingCostBasis)
-  ) {
-    return roundCurrencyAmount(Math.max(0, holding.remainingCostBasis), holding.currency);
-  }
-  return roundCurrencyAmount(qty * Math.max(0, holding.averageCostPerUnit || 0), holding.currency);
+  return 0;
 }
 
 /**

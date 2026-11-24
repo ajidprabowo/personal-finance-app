@@ -81,6 +81,10 @@ export const SCHEMA_V7_STORES: Record<DatabaseTableName, string> = {
   preferences: '&id, installationId, baseCurrency, themePreference, language, updatedAt',
 };
 
+export const SCHEMA_V8_STORES: Record<DatabaseTableName, string> = {
+  ...SCHEMA_V7_STORES,
+};
+
 export const DEFAULT_USER_CATEGORIES: Array<{
   id: string;
   name: string;

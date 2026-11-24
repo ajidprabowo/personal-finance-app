@@ -254,12 +254,6 @@ export function replayHoldingActivities(
       state.remainingCostBasis = res.newRemainingCostBasis;
       state.averageCostPerUnit = res.newAverageCostPerUnit;
 
-      // Initialize currentPrice if never valued yet so initial market value reflects unitPrice
-      if (state.currentPrice === undefined && unitPrice > 0) {
-        state.currentPrice = roundUnitPrice(unitPrice);
-        state.lastValuationDate = act.activityDate;
-      }
-
       activityPatches.push({
         id: act.id,
         grossAmount: res.grossAmount,
@@ -284,10 +278,6 @@ export function replayHoldingActivities(
         addDecimal(state.realizedPnlTotal, res.realizedPnl),
         state.currency
       );
-
-      if (state.currentPrice === undefined && unitPrice > 0) {
-        state.currentPrice = roundUnitPrice(unitPrice);
-      }
 
       activityPatches.push({
         id: act.id,
@@ -319,7 +309,7 @@ export function replayHoldingActivities(
       state.currency
     );
   } else {
-    state.currentMarketValue = state.remainingCostBasis;
+    state.currentMarketValue = 0;
   }
 
   return {

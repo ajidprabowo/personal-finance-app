@@ -20,7 +20,7 @@ export const APP_CONFIG = {
   consoleTitle: 'Stage 1 Foundation Console',
   consoleSubtitle: 'Local-First IndexedDB Architecture & Verification',
   databaseName: 'personal_finance_local_db',
-  currentSchemaVersion: 7,
+  currentSchemaVersion: 8,
   defaultInvestmentPoolAccountId: 'acc_default_investment_pool',
   backupFormatVersion: '1.0.0',
   backupAppIdentifier: 'personal-finance-local-first',

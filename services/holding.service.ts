@@ -17,7 +17,6 @@ export interface CreateHoldingInput {
   assetClassId: string;
   platformId: string;
   currency?: string;
-  currentPrice?: number;
   notes?: string;
 }
 
@@ -31,7 +30,8 @@ export interface HoldingEnriched {
   quantity: number;
   averageCostPerUnit: number;
   remainingCostBasis: number;
-  currentPrice: number;
+  currentPrice: number | null;
+  priceRecorded: boolean;
   marketValue: number;
   unrealizedPnl: number;
   unrealizedPnlPct: number | null;
@@ -103,11 +103,6 @@ export async function createHolding(
     );
   }
 
-  const currentPrice =
-    input.currentPrice !== undefined && Number.isFinite(input.currentPrice) && input.currentPrice >= 0
-      ? roundUnitPrice(input.currentPrice)
-      : undefined;
-
   return holdingsRepository.create({
     platformId: platform.id,
     assetClassId: assetClass.id,
@@ -117,8 +112,9 @@ export async function createHolding(
     quantity: 0,
     averageCostPerUnit: 0,
     remainingCostBasis: 0,
-    currentPrice,
+    currentPrice: undefined,
     currentMarketValue: 0,
+    priceRecorded: false,
     realizedPnlTotal: 0,
     isArchived: false,
     notes: input.notes?.trim() || undefined,
@@ -183,14 +179,14 @@ export function enrichHoldingRecord(
       ? roundUnitPrice(holding.averageCostPerUnit || remainingCostBasis / quantity)
       : 0;
   const marketValue = resolveHoldingMarketValue(holding);
+  const priceRecorded = holding.priceRecorded === true;
   const currentPrice =
-    typeof holding.currentPrice === 'number' && Number.isFinite(holding.currentPrice)
+    priceRecorded && typeof holding.currentPrice === 'number' && Number.isFinite(holding.currentPrice)
       ? holding.currentPrice
-      : quantity > 0
-        ? roundUnitPrice(marketValue / quantity)
-        : 0;
-
-  const pnl = computeUnrealizedPnl(marketValue, remainingCostBasis, holding.currency);
+      : null;
+  const pnl = priceRecorded
+    ? computeUnrealizedPnl(marketValue, remainingCostBasis, holding.currency)
+    : { marketValue: 0, remainingCostBasis, unrealizedPnl: 0, unrealizedPnlPct: null };
 
   return {
     holding,
@@ -203,6 +199,7 @@ export function enrichHoldingRecord(
     averageCostPerUnit,
     remainingCostBasis: pnl.remainingCostBasis,
     currentPrice,
+    priceRecorded,
     marketValue: pnl.marketValue,
     unrealizedPnl: pnl.unrealizedPnl,
     unrealizedPnlPct: pnl.unrealizedPnlPct,

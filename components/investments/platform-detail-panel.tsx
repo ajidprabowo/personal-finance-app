@@ -217,7 +217,7 @@ export function PlatformDetailPanel({
                     <th className="px-3 py-2.5 font-semibold">Class</th>
                     <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
                     <th className="px-3 py-2.5 text-right font-semibold">Avg Cost</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">Market Value</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">Price / Market Value</th>
                     <th className="px-3 py-2.5 text-right font-semibold">Unrealized P/L</th>
                     <th className="px-4 py-2.5 text-right font-semibold">Actions</th>
                   </tr>
@@ -237,7 +237,14 @@ export function PlatformDetailPanel({
                         {formatCurrency(h.averageCostPerUnit, h.holding.currency, numberFormat)}
                       </td>
                       <td className="px-3 py-3 text-right font-semibold tabular-nums text-ink">
-                        {formatCurrency(h.marketValue, h.holding.currency, numberFormat)}
+                        {h.priceRecorded && h.currentPrice !== null
+                          ? <>
+                              <p>{formatCurrency(h.currentPrice, h.holding.currency, numberFormat)}</p>
+                              <p className="text-[11px] font-normal text-ink-muted">
+                                {formatCurrency(h.marketValue, h.holding.currency, numberFormat)}
+                              </p>
+                            </>
+                          : 'Price Not Recorded'}
                       </td>
                       <td
                         className={cn(
@@ -249,8 +256,9 @@ export function PlatformDetailPanel({
                               : 'text-ink-muted'
                         )}
                       >
-                        {h.unrealizedPnl > 0 ? '+' : ''}
-                        {formatCurrency(h.unrealizedPnl, h.holding.currency, numberFormat)}
+                        {h.priceRecorded
+                          ? `${h.unrealizedPnl > 0 ? '+' : ''}${formatCurrency(h.unrealizedPnl, h.holding.currency, numberFormat)}`
+                          : 'Price Not Recorded'}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-1">
@@ -266,7 +274,7 @@ export function PlatformDetailPanel({
                             Sell
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => onValuateHolding(h)}>
-                            Price
+                            Record Price
                           </Button>
                         </div>
                       </td>

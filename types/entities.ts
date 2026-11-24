@@ -257,6 +257,7 @@ export interface Holding extends TestTaggedEntity {
   remainingCostBasis?: number;
   currentPrice?: number;
   currentMarketValue?: number;
+  priceRecorded?: boolean;
   lastValuationDate?: string;
   realizedPnlTotal?: number;
   poolAccountId?: string;

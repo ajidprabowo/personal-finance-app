@@ -138,6 +138,7 @@ export async function getInvestmentOverviewSnapshot(options?: {
   const manualFxRates = prefs?.manualFxRates ?? [];
 
   const byCurrency: Record<string, CurrencyInvestmentMetrics> = {};
+  const pricedCostBasisByCurrency = new Map<string, number>();
   const ensureCurrencyBucket = (currency: string): CurrencyInvestmentMetrics => {
     const code = currency.toUpperCase();
     if (!byCurrency[code]) {
@@ -195,6 +196,12 @@ export async function getInvestmentOverviewSnapshot(options?: {
       addDecimal(bucket.remainingCostBasis, cb),
       code
     );
+    if (h.priceRecorded === true) {
+      pricedCostBasisByCurrency.set(
+        code,
+        roundCurrencyAmount(addDecimal(pricedCostBasisByCurrency.get(code) ?? 0, cb), code)
+      );
+    }
     bucket.realizedPnl = roundCurrencyAmount(addDecimal(bucket.realizedPnl, realized), code);
   }
 
@@ -233,7 +240,7 @@ export async function getInvestmentOverviewSnapshot(options?: {
 
     const unrealized = computeUnrealizedPnl(
       bucket.holdingsMarketValue,
-      bucket.remainingCostBasis,
+      pricedCostBasisByCurrency.get(bucket.currency) ?? 0,
       bucket.currency
     );
     bucket.unrealizedPnl = unrealized.unrealizedPnl;
@@ -290,7 +297,9 @@ export async function getInvestmentOverviewSnapshot(options?: {
 
     item.holdingCount += 1;
     item.marketValue = roundCurrencyAmount(addDecimal(item.marketValue, mv), code);
-    item.costBasis = roundCurrencyAmount(addDecimal(item.costBasis, cb), code);
+    if (h.priceRecorded === true) {
+      item.costBasis = roundCurrencyAmount(addDecimal(item.costBasis, cb), code);
+    }
     item.unrealizedPnl = roundCurrencyAmount(subtractDecimal(item.marketValue, item.costBasis), code);
     item.realizedPnl = roundCurrencyAmount(addDecimal(item.realizedPnl, realized), code);
     item.totalPnl = roundCurrencyAmount(addDecimal(item.unrealizedPnl, item.realizedPnl), code);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowLeftRight, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,7 @@ import {
   updateInvestmentPlatformInfo,
   withdrawFromInvestmentPool,
   contributeToInvestmentPool,
+  listValuationSnapshots,
   type EnrichedInvestmentActivity,
   type HoldingEnriched,
   type PlatformWithMetrics,
@@ -48,6 +49,7 @@ import type {
   ManualFxRateEntry,
   NumberFormatPreference,
   PlatformKind,
+  PortfolioValuation,
 } from '@/types/entities';
 
 const CURRENCY_OPTIONS = [
@@ -420,11 +422,6 @@ function HoldingFormBody({
   const [currency, setCurrency] = useState<string>(
     editingHolding?.holding.currency ?? defaultPlatCurrency
   );
-  const [currentPrice, setCurrentPrice] = useState<string>(
-    editingHolding?.holding.currentPrice !== undefined
-      ? String(editingHolding.holding.currentPrice)
-      : ''
-  );
   const [notes, setNotes] = useState<string>(editingHolding?.holding.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -443,14 +440,12 @@ function HoldingFormBody({
         });
         notifySuccess(`Holding ${symbol.toUpperCase()} updated.`);
       } else {
-        const parsedPrice = currentPrice.trim() ? Number(currentPrice) : undefined;
         await createHolding({
           symbol,
           name,
           platformId,
           assetClassId,
           currency,
-          currentPrice: parsedPrice,
           notes,
         });
         notifySuccess(`Holding ${symbol.toUpperCase()} created.`);
@@ -521,17 +516,7 @@ function HoldingFormBody({
           onChange={(e) => setCurrency(e.target.value)}
           options={CURRENCY_OPTIONS}
         />
-        {!isEditing ? (
-          <Input
-            label="Initial Market Price (optional)"
-            type="number"
-            step="any"
-            min="0"
-            value={currentPrice}
-            onChange={(e) => setCurrentPrice(e.target.value)}
-            placeholder="Optional starting price"
-          />
-        ) : null}
+        {!isEditing ? <div className="self-center text-xs text-ink-muted">Record a price after creating the holding.</div> : null}
       </div>
 
       <Input
@@ -617,7 +602,7 @@ function TradeOrIncomeBody({
   const [holdingId, setHoldingId] = useState<string>(startHoldingId);
   const [quantity, setQuantity] = useState<string>('');
   const [unitPrice, setUnitPrice] = useState<string>(
-    initialHolding?.currentPrice ? String(initialHolding.currentPrice) : ''
+    initialHolding?.currentPrice !== undefined ? String(initialHolding.currentPrice) : ''
   );
   const [amount, setAmount] = useState<string>('');
   const [feeAmount, setFeeAmount] = useState<string>('0');
@@ -800,7 +785,7 @@ function TradeOrIncomeBody({
             const nextId = e.target.value;
             setHoldingId(nextId);
             const h = platformHoldings.find((item) => item.holding.id === nextId);
-            if (h && h.currentPrice > 0 && !unitPrice) {
+            if (h && h.currentPrice !== null && h.currentPrice > 0 && !unitPrice) {
               setUnitPrice(String(h.currentPrice));
             }
           }}
@@ -1024,6 +1009,7 @@ export interface ValuationUpdateModalProps {
   baseCurrency: string;
   timezone: string;
   numberFormat: NumberFormatPreference;
+  dateFormat: DateFormatPreference;
 }
 
 function ValuationUpdateBody({
@@ -1033,21 +1019,51 @@ function ValuationUpdateBody({
   baseCurrency,
   timezone,
   numberFormat,
+  dateFormat,
 }: Omit<ValuationUpdateModalProps, 'open'>) {
   const { notifySuccess } = useNotifications();
   const [inputMode, setInputMode] = useState<'unit_price' | 'market_value'>('unit_price');
   const [unitPrice, setUnitPrice] = useState<string>(
-    holding?.currentPrice ? String(holding.currentPrice) : ''
+    holding?.currentPrice !== null && holding?.currentPrice !== undefined
+      ? String(holding.currentPrice)
+      : ''
   );
   const [marketValue, setMarketValue] = useState<string>(
     holding?.marketValue ? String(holding.marketValue) : ''
   );
   const [valuationDate, setValuationDate] = useState<string>(todayDateString(timezone));
   const [fxRateToBase, setFxRateToBase] = useState<string>('');
-  const [recordSnapshot, setRecordSnapshot] = useState<boolean>(true);
   const [notes, setNotes] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [priceHistory, setPriceHistory] = useState<PortfolioValuation[]>([]);
+
+  useEffect(() => {
+    if (!holding) {
+      setPriceHistory([]);
+      return;
+    }
+    let active = true;
+    void listValuationSnapshots({ scope: 'holding', holdingId: holding.holding.id })
+      .then((rows) => {
+        if (active) {
+          setPriceHistory(
+            rows
+              .filter((row): row is PortfolioValuation & { unitPrice: number } =>
+                typeof row.unitPrice === 'number'
+              )
+              .sort((a, b) =>
+                b.valuationDate.localeCompare(a.valuationDate) ||
+                b.createdAt.localeCompare(a.createdAt)
+              )
+          );
+        }
+      })
+      .catch(() => {
+        if (active) setPriceHistory([]);
+      });
+    return () => { active = false; };
+  }, [holding?.holding.id]);
 
   if (!holding) return null;
 
@@ -1070,7 +1086,6 @@ function ValuationUpdateBody({
         valuationDate,
         fxRateToBase: fxRateToBase.trim() ? Number(fxRateToBase) : undefined,
         baseCurrency,
-        recordSnapshot,
         notes: notes || undefined,
       });
       notifySuccess(`Valuation updated for ${holding.holding.symbol}.`);
@@ -1148,7 +1163,7 @@ function ValuationUpdateBody({
           />
         )}
         <Input
-          label="Valuation Date"
+          label="Price Date"
           type="date"
           required
           value={valuationDate}
@@ -1168,15 +1183,7 @@ function ValuationUpdateBody({
         />
       ) : null}
 
-      <label className="flex items-center gap-2 text-xs text-ink">
-        <input
-          type="checkbox"
-          checked={recordSnapshot}
-          onChange={(e) => setRecordSnapshot(e.target.checked)}
-          className="h-4 w-4 rounded border-line"
-        />
-        <span>Also save a historical valuation snapshot</span>
-      </label>
+      <p className="text-xs text-ink-muted">Each recorded price is saved to this holding's price history.</p>
 
       <Input
         label="Notes (optional)"
@@ -1184,6 +1191,25 @@ function ValuationUpdateBody({
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Manual price source or closing quote note"
       />
+
+      <div className="rounded-lg border border-line px-3 py-2.5">
+        <p className="mb-2 text-xs font-semibold text-ink">Price History</p>
+        {priceHistory.length ? (
+          <ul className="max-h-32 space-y-1 overflow-y-auto text-xs">
+            {priceHistory.map((entry) => (
+              <li key={entry.id} className="flex justify-between gap-3 text-ink-muted">
+                <span title={entry.notes}>
+                  {formatDisplayDate(entry.valuationDate, dateFormat)}
+                  {entry.notes ? <span className="ml-1">· {entry.notes}</span> : null}
+                </span>
+                <span className="shrink-0 tabular-nums text-ink">
+                  {formatCurrency(entry.unitPrice ?? 0, holding.holding.currency, numberFormat)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-xs text-ink-muted">No price recorded yet.</p>}
+      </div>
 
       <div className="flex items-center justify-between rounded-lg border border-line bg-surface-muted/40 px-3 py-2 text-xs tabular-nums">
         <span className="text-ink-muted">Projected Unrealized P/L</span>
@@ -1215,8 +1241,8 @@ export function ValuationUpdateModal(props: ValuationUpdateModalProps) {
     <Modal
       open={props.open}
       onClose={props.onClose}
-      title="Update Manual Market Valuation"
-      description="Updates market value and unrealized P/L without altering holding cost basis or cash balances."
+      title="Record Holding Price"
+      description="Save a dated price in the holding's currency. Each entry is retained in price history."
     >
       <ValuationUpdateBody
         key={`${props.open ? 'open' : 'closed'}-${props.holding?.holding.id ?? 'none'}`}
@@ -1226,6 +1252,7 @@ export function ValuationUpdateModal(props: ValuationUpdateModalProps) {
         baseCurrency={props.baseCurrency}
         timezone={props.timezone}
         numberFormat={props.numberFormat}
+        dateFormat={props.dateFormat}
       />
     </Modal>
   );

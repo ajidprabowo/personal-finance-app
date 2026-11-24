@@ -68,6 +68,7 @@ export interface ValuationUpdateInput {
   fxRateToBase?: number;
   fxRateDate?: string;
   baseCurrency?: string;
+  /** Kept for input compatibility; manual price updates are always recorded historically. */
   recordSnapshot?: boolean;
   notes?: string;
 }
@@ -138,7 +139,8 @@ async function applyHoldingReplayInsideTx(
     remainingCostBasis: replayed.state.remainingCostBasis,
     averageCostPerUnit: replayed.state.averageCostPerUnit,
     realizedPnlTotal: replayed.state.realizedPnlTotal,
-    currentPrice: replayed.state.currentPrice ?? holding.currentPrice,
+    currentPrice: replayed.state.currentPrice,
+    priceRecorded: replayed.state.currentPrice !== undefined,
     currentMarketValue:
       replayed.state.quantity === 0
         ? 0
@@ -147,8 +149,8 @@ async function applyHoldingReplayInsideTx(
               multiplyDecimal(replayed.state.quantity, replayed.state.currentPrice),
               holding.currency
             )
-          : replayed.state.remainingCostBasis,
-    lastValuationDate: replayed.state.lastValuationDate ?? holding.lastValuationDate,
+          : 0,
+    lastValuationDate: replayed.state.lastValuationDate,
     updatedAt: timestamp,
   };
 
@@ -516,17 +518,32 @@ export async function recordValuationUpdateActivity(
 
       await db.investmentActivities.add(activity);
 
+      // Replay makes the latest dated manual price the active valuation, including
+      // when a user records a historical price after a newer one.
+      const allActivities = await db.investmentActivities
+        .where('holdingId')
+        .equals(holding.id)
+        .toArray();
+      const replayed = replayHoldingActivities(
+        allActivities.filter((item) => item.recordOrigin === origin),
+        holding.currency
+      );
       const updatedHolding: Holding = {
         ...holding,
-        currentPrice: nextUnitPrice,
-        currentMarketValue: nextMarketValue,
-        lastValuationDate: valuationDate,
+        quantity: replayed.state.quantity,
+        remainingCostBasis: replayed.state.remainingCostBasis,
+        averageCostPerUnit: replayed.state.averageCostPerUnit,
+        realizedPnlTotal: replayed.state.realizedPnlTotal,
+        currentPrice: replayed.state.currentPrice,
+        priceRecorded: replayed.state.currentPrice !== undefined,
+        currentMarketValue: replayed.state.currentMarketValue,
+        lastValuationDate: replayed.state.lastValuationDate,
         updatedAt: timestamp,
       };
       await db.holdings.put(updatedHolding);
 
-      let snapshot: PortfolioValuation | undefined;
-      if (input.recordSnapshot ?? true) {
+      let snapshot: PortfolioValuation;
+      {
         const baseCurrency = input.baseCurrency?.toUpperCase();
         const convertedMarketValue =
           input.fxRateToBase && input.fxRateToBase > 0
@@ -547,7 +564,7 @@ export async function recordValuationUpdateActivity(
           unitPrice: nextUnitPrice,
           marketValue: nextMarketValue,
           costBasis:
-            holding.remainingCostBasis ??
+            replayed.state.remainingCostBasis ??
             roundCurrencyAmount(
               multiplyDecimal(holding.quantity, holding.averageCostPerUnit || 0),
               holding.currency

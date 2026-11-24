@@ -479,7 +479,7 @@ describe('Stage 7 — Profile & Settings Refinement Engine & v7 Migration', () =
     assert.equal((await getManualFxRates()).length, 1);
   });
 
-  it('6. Backup export/lastBackupAt, validation rejections, atomic rollback, clear data & v1->v7 migration', async () => {
+  it('6. Backup export/lastBackupAt, validation rejections, atomic rollback, clear data & v1->v8 migration', async () => {
     const wallet = await createUserAccount({
       name: 'Main Checking',
       type: 'bank',
@@ -557,9 +557,9 @@ describe('Stage 7 — Profile & Settings Refinement Engine & v7 Migration', () =
     const intactAfterRollback = await accountsRepository.getById(wallet.id);
     assert.equal(intactAfterRollback?.name, 'Main Checking');
 
-    // Verify migration probe v1 -> v7 passes
+    // Verify migration probe v1 -> v8 passes
     const migration = await verifyDexieMigrationProbe();
     assert.equal(migration.passed, true);
-    assert.equal(migration.testedToVersion, 7);
+    assert.equal(migration.testedToVersion, 8);
   });
 });

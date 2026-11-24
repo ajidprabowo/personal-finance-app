@@ -226,6 +226,7 @@ export async function listPlatformsWithMetrics(options?: {
       const platHoldings = holdings.filter((h) => h.platformId === platform.id);
       let holdingsValue = 0;
       let remainingCostBasis = 0;
+      let pricedRemainingCostBasis = 0;
       let realizedPnlTotal = 0;
       let activeHoldingCount = 0;
 
@@ -239,6 +240,12 @@ export async function listPlatformsWithMetrics(options?: {
         if (h.currency.toUpperCase() === currency) {
           holdingsValue = roundCurrencyAmount(addDecimal(holdingsValue, mv), currency);
           remainingCostBasis = roundCurrencyAmount(addDecimal(remainingCostBasis, cb), currency);
+          if (h.priceRecorded === true) {
+            pricedRemainingCostBasis = roundCurrencyAmount(
+              addDecimal(pricedRemainingCostBasis, cb),
+              currency
+            );
+          }
           realizedPnlTotal = roundCurrencyAmount(
             addDecimal(realizedPnlTotal, h.realizedPnlTotal ?? 0),
             currency
@@ -264,7 +271,7 @@ export async function listPlatformsWithMetrics(options?: {
         }
       }
 
-      const pnl = computeUnrealizedPnl(holdingsValue, remainingCostBasis, currency);
+      const pnl = computeUnrealizedPnl(holdingsValue, pricedRemainingCostBasis, currency);
       const totalPlatformValue = roundCurrencyAmount(
         addDecimal(cashBalance, holdingsValue),
         currency
@@ -362,10 +369,12 @@ export async function getPlatformDetail(
       addDecimal(existing.marketValue, item.marketValue),
       summary.currency
     );
-    existing.costBasis = roundCurrencyAmount(
-      addDecimal(existing.costBasis, item.remainingCostBasis),
-      summary.currency
-    );
+    if (item.priceRecorded) {
+      existing.costBasis = roundCurrencyAmount(
+        addDecimal(existing.costBasis, item.remainingCostBasis),
+        summary.currency
+      );
+    }
     existing.unrealizedPnl = roundCurrencyAmount(
       subtractDecimal(existing.marketValue, existing.costBasis),
       summary.currency

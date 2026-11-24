@@ -119,10 +119,6 @@ export function validateTransactionInput(
       }
     }
   } else {
-    if (!description) {
-      errors.push('Description is required for income and expense transactions.');
-    }
-
     const category = raw.categoryId ? ctx.categoriesById.get(raw.categoryId) : undefined;
     if (!raw.categoryId || !category) {
       errors.push('A valid category is required for income and expense transactions.');
@@ -130,13 +126,20 @@ export function validateTransactionInput(
       errors.push(`Category "${category.name}" is archived and cannot be used for new transactions.`);
     } else {
       validatedCategoryId = category.id;
+      let validSubcategory: Subcategory | undefined;
       if (raw.subcategoryId && ctx.subcategoriesById) {
         const sub = ctx.subcategoriesById.get(raw.subcategoryId);
         if (!sub || sub.categoryId !== category.id) {
           errors.push('Selected subcategory does not belong to the chosen category.');
         } else if (sub.isArchived && !ctx.editingTransactionId) {
           errors.push(`Subcategory "${sub.name}" is archived and cannot be used for new transactions.`);
+        } else {
+          validSubcategory = sub;
         }
+      }
+      if (!description) {
+        if (validSubcategory) description = validSubcategory.name;
+        else errors.push('Description is required unless a subcategory is selected.');
       }
     }
   }

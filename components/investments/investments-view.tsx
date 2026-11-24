@@ -888,7 +888,9 @@ export function InvestmentsView() {
                         <div className="flex shrink-0 items-center gap-3">
                           <div className="text-right tabular-nums">
                             <p className="font-semibold text-ink">
-                              {formatCurrency(h.marketValue, h.holding.currency, numberFormat)}
+                              {h.priceRecorded
+                                ? formatCurrency(h.marketValue, h.holding.currency, numberFormat)
+                                : 'Price Not Recorded'}
                             </p>
                             <p
                               className={cn(
@@ -900,8 +902,9 @@ export function InvestmentsView() {
                                     : 'text-ink-muted'
                               )}
                             >
-                              {h.unrealizedPnl > 0 ? '+' : ''}
-                              {formatCurrency(h.unrealizedPnl, h.holding.currency, numberFormat)}
+                              {h.priceRecorded
+                                ? `${h.unrealizedPnl > 0 ? '+' : ''}${formatCurrency(h.unrealizedPnl, h.holding.currency, numberFormat)}`
+                                : 'Price Not Recorded'}
                             </p>
                           </div>
                           <Button
@@ -1384,10 +1387,14 @@ export function InvestmentsView() {
                             {formatCurrency(h.averageCostPerUnit, h.holding.currency, numberFormat)}
                           </td>
                           <td className="px-3 py-3 text-right tabular-nums text-ink">
-                            {formatCurrency(h.currentPrice, h.holding.currency, numberFormat)}
+                          {h.priceRecorded && h.currentPrice !== null
+                            ? formatCurrency(h.currentPrice, h.holding.currency, numberFormat)
+                            : 'Price Not Recorded'}
                           </td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums text-ink">
-                            {formatCurrency(h.marketValue, h.holding.currency, numberFormat)}
+                            {h.priceRecorded
+                              ? formatCurrency(h.marketValue, h.holding.currency, numberFormat)
+                              : 'Price Not Recorded'}
                           </td>
                           <td
                             className={cn(
@@ -1400,10 +1407,11 @@ export function InvestmentsView() {
                             )}
                           >
                             <p>
-                              {h.unrealizedPnl > 0 ? '+' : ''}
-                              {formatCurrency(h.unrealizedPnl, h.holding.currency, numberFormat)}
+                              {h.priceRecorded
+                                ? `${h.unrealizedPnl > 0 ? '+' : ''}${formatCurrency(h.unrealizedPnl, h.holding.currency, numberFormat)}`
+                                : 'Price Not Recorded'}
                             </p>
-                            {h.unrealizedPnlPct !== null ? (
+                            {h.priceRecorded && h.unrealizedPnlPct !== null ? (
                               <p className="text-[11px]">
                                 {h.unrealizedPnlPct > 0 ? '+' : ''}
                                 {h.unrealizedPnlPct.toFixed(2)}%
@@ -1435,7 +1443,7 @@ export function InvestmentsView() {
                                   setValuationModalOpen(true);
                                 }}
                               >
-                                Price
+                                Record Price
                               </Button>
                               <Button
                                 variant="ghost"
@@ -2002,6 +2010,7 @@ export function InvestmentsView() {
             baseCurrency={baseCurrency}
             timezone={timezone}
             numberFormat={numberFormat}
+            dateFormat={dateFormat}
           />
 
           <PortfolioSnapshotModal

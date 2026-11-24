@@ -526,6 +526,16 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
       unitPrice: 120,
       activityDate: '2026-11-01',
     }); // 240 USD + 260 USD cash = 500 USD total
+    await recordValuationUpdateActivity({
+      holdingId: bbca.id,
+      unitPrice: 9_000,
+      valuationDate: '2026-11-10',
+    });
+    await recordValuationUpdateActivity({
+      holdingId: nvda.id,
+      unitPrice: 120,
+      valuationDate: '2026-11-10',
+    });
 
     // Missing FX rate must throw if explicit conversion attempted & mark canConvertAll = false
     assert.throws(() => convertCurrencyWithManualRate(500, 'USD', 'IDR', null), ValidationError);
@@ -650,7 +660,74 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
     assert.equal(validation.valid, true, JSON.stringify(validation.issues));
   });
 
-  it('8. Schema v1->v5 migration probe & persistence reconstruction across DB reopen', async () => {
+  it('8. Manual prices drive valuation, retain dated history, and preserve weighted cost after partial sales', async () => {
+    const broker = await createInvestmentPlatformWithCashAccount({
+      name: 'Manual Price Broker',
+      kind: 'brokerage',
+      defaultCurrency: 'USD',
+    });
+    const stockClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
+    const holding = await createHolding({
+      symbol: 'TEST',
+      name: 'Test Holding',
+      platformId: broker.id,
+      assetClassId: stockClass.id,
+      currency: 'USD',
+    });
+    await recordBuyActivity({
+      platformId: broker.id,
+      holdingId: holding.id,
+      quantity: 10,
+      unitPrice: 50,
+      activityDate: '2026-11-01',
+    });
+
+    let detail = await getPlatformDetail(broker.id);
+    let enriched = detail.holdings.find((item) => item.holding.id === holding.id)!;
+    assert.equal(enriched.priceRecorded, false);
+    assert.equal(enriched.currentPrice, null);
+    assert.equal(enriched.marketValue, 0);
+
+    await recordValuationUpdateActivity({
+      holdingId: holding.id,
+      unitPrice: 60,
+      valuationDate: '2026-11-20',
+      notes: 'Closing price',
+    });
+    await recordSellActivity({
+      platformId: broker.id,
+      holdingId: holding.id,
+      quantity: 4,
+      unitPrice: 70,
+      activityDate: '2026-11-21',
+    });
+
+    detail = await getPlatformDetail(broker.id);
+    enriched = detail.holdings.find((item) => item.holding.id === holding.id)!;
+    assert.equal(enriched.quantity, 6);
+    assert.equal(enriched.remainingCostBasis, 300);
+    assert.equal(enriched.currentPrice, 60);
+    assert.equal(enriched.marketValue, 360);
+    assert.equal(enriched.unrealizedPnl, 60);
+    assert.equal(enriched.unrealizedPnlPct, 20);
+
+    await recordValuationUpdateActivity({
+      holdingId: holding.id,
+      unitPrice: 55,
+      valuationDate: '2026-11-10',
+      notes: 'Backdated entry',
+      recordSnapshot: false,
+    });
+    detail = await getPlatformDetail(broker.id);
+    enriched = detail.holdings.find((item) => item.holding.id === holding.id)!;
+    assert.equal(enriched.currentPrice, 60, 'latest dated price remains active');
+    const history = (await portfolioValuationsRepository.getUserRecords()).filter(
+      (item) => item.holdingId === holding.id
+    );
+    assert.equal(history.length, 2, 'all manual prices persist even when legacy option is false');
+  });
+
+  it('9. Schema v1->v8 migration probe & persistence reconstruction across DB reopen', async () => {
     const probe = await verifyDexieMigrationProbe();
     assert.equal(probe.passed, true, probe.notes);
     assert.equal(probe.testedToVersion, APP_CONFIG.currentSchemaVersion);

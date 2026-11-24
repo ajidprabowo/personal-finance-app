@@ -81,6 +81,14 @@ export const MIGRATION_HISTORY: MigrationRecord[] = [
     backwardCompatible: true,
     tablesAffected: ['appInstallation', 'preferences', 'categories'],
   },
+  {
+    version: 8,
+    name: 'Manual Holding Price History',
+    description:
+      'Separates recorded market prices from buy and sell execution prices and backfills historical manual valuation entries.',
+    backwardCompatible: true,
+    tablesAffected: ['appInstallation', 'holdings', 'investmentActivities', 'portfolioValuations'],
+  },
 ];
 
 const TEST_TAGGED_TABLES = [
@@ -423,6 +431,158 @@ export async function upgradeV6ToV7(tx: DexieTransaction): Promise<void> {
         record.icon = DEFAULT_CATEGORY_ICON_MAP[record.id] ?? 'tag';
       }
     });
+
+  await tx
+    .table('appInstallation')
+    .toCollection()
+    .modify((record: Record<string, unknown>) => {
+      record.schemaVersion = APP_CONFIG.currentSchemaVersion;
+      record.updatedAt = timestamp;
+    });
+}
+
+/**
+ * v7 -> v8 separates manually recorded market prices from trade execution prices.
+ * Historical valuation activities remain the source of truth for whether a holding
+ * has a recorded price; trade prices never become market prices implicitly.
+ */
+export async function upgradeV7ToV8(tx: DexieTransaction): Promise<void> {
+  const timestamp = nowIso();
+  const activities = (await tx.table('investmentActivities').toArray()) as Array<{
+    id?: string;
+    platformId?: string;
+    holdingId?: string;
+    activityType?: string;
+    unitPrice?: number;
+    quantity?: number;
+    grossAmount?: number;
+    currency?: string;
+    activityDate?: string;
+    notes?: string;
+    isTestData?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+    recordOrigin?: string;
+  }>;
+  const priceByHolding = new Map<string, (typeof activities)[number]>();
+
+  for (const activity of activities) {
+    if (
+      !activity.holdingId ||
+      (activity.activityType !== 'valuation_update' &&
+        activity.activityType !== 'valuation_adjustment') ||
+      typeof activity.unitPrice !== 'number' ||
+      !Number.isFinite(activity.unitPrice)
+    ) {
+      continue;
+    }
+    const previous = priceByHolding.get(activity.holdingId);
+    if (
+      !previous ||
+      `${activity.activityDate ?? ''}:${activity.createdAt ?? ''}` >
+        `${previous.activityDate ?? ''}:${previous.createdAt ?? ''}`
+    ) {
+      priceByHolding.set(activity.holdingId, activity);
+    }
+  }
+
+  // Older releases could save the valuation activity without its optional snapshot.
+  // Backfill those events so every existing recorded price remains visible as history.
+  const valuations = tx.table('portfolioValuations');
+  const existingSnapshots = (await valuations.toArray()) as Array<{
+    holdingId?: string;
+    valuationDate?: string;
+    unitPrice?: number;
+    createdAt?: string;
+  }>;
+  for (const snapshot of existingSnapshots) {
+    if (
+      !snapshot.holdingId ||
+      typeof snapshot.unitPrice !== 'number' ||
+      !Number.isFinite(snapshot.unitPrice)
+    ) {
+      continue;
+    }
+    const previous = priceByHolding.get(snapshot.holdingId);
+    if (
+      !previous ||
+      `${snapshot.valuationDate ?? ''}:${snapshot.createdAt ?? ''}` >
+        `${previous.activityDate ?? ''}:${previous.createdAt ?? ''}`
+    ) {
+      priceByHolding.set(snapshot.holdingId, {
+        activityDate: snapshot.valuationDate,
+        createdAt: snapshot.createdAt,
+        unitPrice: snapshot.unitPrice,
+      });
+    }
+  }
+  for (const activity of activities) {
+    if (
+      !activity.id ||
+      !activity.holdingId ||
+      !activity.platformId ||
+      (activity.activityType !== 'valuation_update' &&
+        activity.activityType !== 'valuation_adjustment') ||
+      typeof activity.unitPrice !== 'number' ||
+      !Number.isFinite(activity.unitPrice)
+    ) {
+      continue;
+    }
+    const alreadySnapshotted = existingSnapshots.some(
+      (snapshot) =>
+        snapshot.holdingId === activity.holdingId &&
+        snapshot.valuationDate === activity.activityDate &&
+        snapshot.unitPrice === activity.unitPrice &&
+        snapshot.createdAt === activity.createdAt
+    );
+    if (alreadySnapshotted) continue;
+
+    const quantity = typeof activity.quantity === 'number' ? activity.quantity : 0;
+    const marketValue =
+      typeof activity.grossAmount === 'number'
+        ? activity.grossAmount
+        : quantity * activity.unitPrice;
+    await valuations.add({
+      id: `price-history-${activity.id}`,
+      scope: 'holding',
+      platformId: activity.platformId,
+      holdingId: activity.holdingId,
+      valuationDate: activity.activityDate ?? timestamp.slice(0, 10),
+      unitPrice: activity.unitPrice,
+      marketValue,
+      currency: activity.currency ?? 'IDR',
+      notes: activity.notes,
+      source: 'manual',
+      isTestData: activity.isTestData ?? false,
+      recordOrigin: activity.recordOrigin ?? 'user',
+      createdAt: activity.createdAt ?? timestamp,
+      updatedAt: activity.updatedAt ?? activity.createdAt ?? timestamp,
+    });
+    existingSnapshots.push({
+      holdingId: activity.holdingId,
+      valuationDate: activity.activityDate,
+      unitPrice: activity.unitPrice,
+      createdAt: activity.createdAt,
+    });
+  }
+
+  await tx.table('holdings').toCollection().modify((record: Record<string, unknown>) => {
+    const id = typeof record.id === 'string' ? record.id : '';
+    const priceActivity = priceByHolding.get(id);
+    if (priceActivity) {
+      record.priceRecorded = true;
+      record.currentPrice = priceActivity.unitPrice;
+      record.lastValuationDate = priceActivity.activityDate;
+      const quantity = typeof record.quantity === 'number' ? record.quantity : 0;
+      record.currentMarketValue = quantity * (priceActivity.unitPrice ?? 0);
+    } else {
+      record.priceRecorded = false;
+      delete record.currentPrice;
+      record.currentMarketValue = 0;
+      delete record.lastValuationDate;
+    }
+    record.updatedAt = timestamp;
+  });
 
   await tx
     .table('appInstallation')

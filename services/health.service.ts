@@ -8,6 +8,7 @@ import {
   upgradeV4ToV5,
   upgradeV5ToV6,
   upgradeV6ToV7,
+  upgradeV7ToV8,
 } from '@/database/migrations';
 import {
   SCHEMA_V1_STORES,
@@ -17,6 +18,7 @@ import {
   SCHEMA_V5_STORES,
   SCHEMA_V6_STORES,
   SCHEMA_V7_STORES,
+  SCHEMA_V8_STORES,
   TABLE_SCHEMA_CATALOG,
 } from '@/database/schema';
 import { validateDatabaseIntegrity } from '@/database/validator';
@@ -141,47 +143,51 @@ export async function verifyDexieMigrationProbe(): Promise<MigrationVerification
     });
     v1Db.close();
 
-    // Step 2: Reopen with v7 schema and run v1 -> v2 -> v3 -> v4 -> v5 -> v6 -> v7 migration hooks
-    const v7Db = new Dexie(probeDbName);
-    v7Db.version(1).stores(SCHEMA_V1_STORES);
-    v7Db
+    // Step 2: Reopen with current schema and run every migration hook.
+    const currentDb = new Dexie(probeDbName);
+    currentDb.version(1).stores(SCHEMA_V1_STORES);
+    currentDb
       .version(2)
       .stores(SCHEMA_V2_STORES)
       .upgrade((tx) => upgradeV1ToV2(tx));
-    v7Db
+    currentDb
       .version(3)
       .stores(SCHEMA_V3_STORES)
       .upgrade((tx) => upgradeV2ToV3(tx));
-    v7Db
+    currentDb
       .version(4)
       .stores(SCHEMA_V4_STORES)
       .upgrade((tx) => upgradeV3ToV4(tx));
-    v7Db
+    currentDb
       .version(5)
       .stores(SCHEMA_V5_STORES)
       .upgrade((tx) => upgradeV4ToV5(tx));
-    v7Db
+    currentDb
       .version(6)
       .stores(SCHEMA_V6_STORES)
       .upgrade((tx) => upgradeV5ToV6(tx));
-    v7Db
+    currentDb
       .version(7)
       .stores(SCHEMA_V7_STORES)
       .upgrade((tx) => upgradeV6ToV7(tx));
-    await v7Db.open();
+    currentDb
+      .version(8)
+      .stores(SCHEMA_V8_STORES)
+      .upgrade((tx) => upgradeV7ToV8(tx));
+    await currentDb.open();
 
-    const migratedAccount = (await v7Db.table('accounts').get('probe_acc_1')) as
+    const migratedAccount = (await currentDb.table('accounts').get('probe_acc_1')) as
       | Record<string, unknown>
       | undefined;
-    const migratedBudget = (await v7Db.table('budgets').get('probe_budget_1')) as
+    const migratedBudget = (await currentDb.table('budgets').get('probe_budget_1')) as
       | Record<string, unknown>
       | undefined;
-    const migratedInstall = (await v7Db.table('appInstallation').get('probe_install')) as
+    const migratedInstall = (await currentDb.table('appInstallation').get('probe_install')) as
       | Record<string, unknown>
       | undefined;
 
     const passed =
-      v7Db.verno === 7 &&
+      currentDb.verno === 8 &&
       migratedAccount?.recordOrigin === 'user' &&
       migratedAccount?.isTestData === false &&
       migratedBudget?.periodKey === '2026-11' &&
@@ -189,18 +195,18 @@ export async function verifyDexieMigrationProbe(): Promise<MigrationVerification
       migratedBudget?.limitAmount === 1500000 &&
       migratedInstall?.schemaVersion === APP_CONFIG.currentSchemaVersion;
 
-    v7Db.close();
+    currentDb.close();
     await Dexie.delete(probeDbName);
 
     return {
       passed,
       testedFromVersion: 1,
-      testedToVersion: 7,
+      testedToVersion: 8,
       migratedRecordOriginVerified: passed,
       verifiedAt: nowIso(),
       notes: passed
-        ? 'Verified real Dexie v1 -> v2 -> v3 -> v4 -> v5 -> v6 -> v7 upgrade hooks in isolated probe DB: indexes upgraded and legacy records preserved safely.'
-        : 'Migration probe completed but migrated record attributes did not match expected v7 output.',
+        ? 'Verified real Dexie v1 -> v2 -> v3 -> v4 -> v5 -> v6 -> v7 -> v8 upgrade hooks in isolated probe DB: indexes upgraded and legacy records preserved safely.'
+        : 'Migration probe completed but migrated record attributes did not match expected v8 output.',
     };
   } catch (error) {
     await Dexie.delete(probeDbName).catch(() => undefined);

@@ -154,6 +154,8 @@ function TransactionFormBody({
         (!s.isArchived || (isEditing && s.id === initialTransaction?.subcategoryId))
     );
   }, [effectiveSubcategories, type, categoryId, isEditing, initialTransaction?.subcategoryId]);
+  const hasValidSelectedSubcategory =
+    type !== 'transfer' && matchingSubcategories.some((s) => s.id === subcategoryId);
 
   const sourceAccount = selectableAccounts.find((a) => a.id === accountId);
   const destinationOptions = useMemo(
@@ -210,12 +212,17 @@ function TransactionFormBody({
       return;
     }
 
+    const validSubId =
+      type !== 'transfer' && matchingSubcategories.some((s) => s.id === subcategoryId)
+        ? subcategoryId
+        : undefined;
+    if (type !== 'transfer' && !validSubId && !description.trim()) {
+      setFormError('Description is required unless you select a subcategory.');
+      return;
+    }
+
     setSaving(true);
     try {
-      const validSubId =
-        type !== 'transfer' && matchingSubcategories.some((s) => s.id === subcategoryId)
-          ? subcategoryId
-          : undefined;
       const payload = {
         type,
         amount: parsedAmount,
@@ -425,8 +432,12 @@ function TransactionFormBody({
       ) : null}
 
       <Input
-        label={type === 'transfer' ? 'Description (optional)' : 'Description'}
-        required={type !== 'transfer'}
+        label={
+          type === 'transfer' || hasValidSelectedSubcategory
+            ? 'Description (optional)'
+            : 'Description'
+        }
+        required={type !== 'transfer' && !hasValidSelectedSubcategory}
         value={description}
         onChange={(e) => {
           setDescription(e.target.value);

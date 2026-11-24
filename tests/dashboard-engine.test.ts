@@ -231,6 +231,11 @@ describe('Stage 5 — Dashboard & Financial Overview Engine', () => {
       feeAmount: 0,
       activityDate: '2026-11-05',
     });
+    await recordValuationUpdateActivity({
+      holdingId: eth.id,
+      unitPrice: 4_000_000,
+      valuationDate: '2026-11-20',
+    });
 
     const dash = await getDashboardSnapshot({
       todayOverride: '2026-11-20',
@@ -428,6 +433,11 @@ describe('Stage 5 — Dashboard & Financial Overview Engine', () => {
       unitPrice: 1000,
       feeAmount: 0,
       activityDate: '2026-11-03',
+    });
+    await recordValuationUpdateActivity({
+      holdingId: reitHolding.id,
+      unitPrice: 1_000,
+      valuationDate: '2026-11-20',
     });
 
     const zeroExpDash = await getDashboardSnapshot({

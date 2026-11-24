@@ -8,6 +8,7 @@ import {
   upgradeV4ToV5,
   upgradeV5ToV6,
   upgradeV6ToV7,
+  upgradeV7ToV8,
 } from '@/database/migrations';
 import {
   SCHEMA_V1_STORES,
@@ -17,6 +18,7 @@ import {
   SCHEMA_V5_STORES,
   SCHEMA_V6_STORES,
   SCHEMA_V7_STORES,
+  SCHEMA_V8_STORES,
 } from '@/database/schema';
 import type {
   Account,
@@ -84,6 +86,10 @@ export class PersonalFinanceDB extends Dexie {
     this.version(7)
       .stores(SCHEMA_V7_STORES)
       .upgrade((tx) => upgradeV6ToV7(tx));
+
+    this.version(8)
+      .stores(SCHEMA_V8_STORES)
+      .upgrade((tx) => upgradeV7ToV8(tx));
   }
 
   public getTypedTable(name: DatabaseTableName): Table<unknown, string> {
