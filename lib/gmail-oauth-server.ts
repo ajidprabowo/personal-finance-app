@@ -104,10 +104,9 @@ export function buildGoogleAuthorizationUrl(state: string): string {
     client_id: clientId,
     redirect_uri: redirectUri(),
     response_type: 'code',
-    scope: `openid email ${GMAIL_READONLY_SCOPE}`,
+    scope: GMAIL_READONLY_SCOPE,
     access_type: 'offline',
     prompt: 'consent select_account',
-    include_granted_scopes: 'true',
     state,
   });
   return `${GOOGLE_AUTHORIZE_URL}?${params.toString()}`;

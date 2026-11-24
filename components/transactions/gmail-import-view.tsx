@@ -155,7 +155,34 @@ export function GmailImportView() {
     setCategories(catData.categories);
     setSubcategories(subRows);
     setHistory(historyRows);
-  }, []);
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const oauthResult = url.searchParams.get('gmail');
+      if (oauthResult === 'connected') {
+        if (sessionSnap.effectiveStatus === 'connected') {
+          notifySuccess(
+            'Gmail connected',
+            `Verified read-only access for ${sessionSnap.connection?.emailAddress ?? 'Gmail'}.`
+          );
+        } else {
+          notifyError(
+            'Gmail verification failed',
+            'Google returned to the app, but the server could not verify the Gmail session.'
+          );
+        }
+        url.searchParams.delete('gmail');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      } else if (oauthResult === 'error') {
+        notifyError(
+          'Gmail connection failed',
+          'Google authorization did not complete. Check the deployment logs for the Gmail OAuth callback failure stage.'
+        );
+        url.searchParams.delete('gmail');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      }
+    }
+  }, [notifyError, notifySuccess]);
 
   useEffect(() => {
     let active = true;
