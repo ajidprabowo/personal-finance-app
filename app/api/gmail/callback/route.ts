@@ -6,6 +6,7 @@ import {
   GmailSessionPersistenceError,
   getGmailSession,
   gmailImportReturnUrl,
+  gmailOAuthOrigin,
   setGmailSessionCookie,
   validateOAuthState,
   verifyGrantedGmailScope,
@@ -17,16 +18,26 @@ export async function GET(request: NextRequest) {
   let stage = 'validate_callback';
   const code = request.nextUrl.searchParams.get('code');
   const state = request.nextUrl.searchParams.get('state');
-  if (request.nextUrl.searchParams.has('error') || !validateOAuthState(request, state) || !code) {
-    console.warn('[gmail-oauth] callback rejected', {
-      reason: request.nextUrl.searchParams.has('error')
+  const validState = validateOAuthState(request, state);
+  const deniedByGoogle = request.nextUrl.searchParams.has('error');
+  if (
+    request.nextUrl.origin !== gmailOAuthOrigin() ||
+    deniedByGoogle ||
+    !validState ||
+    !code
+  ) {
+    const reason = request.nextUrl.origin !== gmailOAuthOrigin()
+      ? 'origin_mismatch'
+      : deniedByGoogle
         ? 'google_denied'
-        : !validateOAuthState(request, state)
+        : !validState
           ? 'state_mismatch'
-          : 'missing_code',
+          : 'missing_code';
+    console.warn('[gmail-oauth] callback rejected', {
+      reason,
     });
     const response = NextResponse.redirect(gmailImportReturnUrl('error'));
-    clearOAuthStateCookie(response);
+    if (validState && state) clearOAuthStateCookie(response, state);
     return response;
   }
 
@@ -57,7 +68,7 @@ export async function GET(request: NextRequest) {
       refreshToken,
       emailAddress: profile.emailAddress,
     });
-    clearOAuthStateCookie(response);
+    if (state) clearOAuthStateCookie(response, state);
     return response;
   } catch (error) {
     console.error('[gmail-oauth] callback failed', {
@@ -67,7 +78,7 @@ export async function GET(request: NextRequest) {
         : 'oauth_callback_error',
     });
     const response = NextResponse.redirect(gmailImportReturnUrl('error'));
-    clearOAuthStateCookie(response);
+    if (state) clearOAuthStateCookie(response, state);
     return response;
   }
 }

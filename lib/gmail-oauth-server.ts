@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from '
 import type { NextRequest, NextResponse } from 'next/server';
 
 export const GMAIL_SESSION_COOKIE = 'gmail_oauth_session';
-export const GMAIL_STATE_COOKIE = 'gmail_oauth_state';
+const GMAIL_STATE_COOKIE_PREFIX = 'gmail_oauth_state_';
 const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_TOKEN_INFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
@@ -55,6 +55,14 @@ function redirectUri(): string {
 export function gmailImportReturnUrl(status: 'connected' | 'error'): URL {
   const base = new URL(redirectUri());
   return new URL(`/transactions/import?gmail=${status}`, base.origin);
+}
+
+export function gmailOAuthOrigin(): string {
+  return new URL(redirectUri()).origin;
+}
+
+export function gmailOAuthConnectUrl(): URL {
+  return new URL('/api/gmail/connect', gmailOAuthOrigin());
 }
 
 function encryptionKey(): Buffer {
@@ -138,12 +146,21 @@ export function buildGoogleAuthorizationUrl(state: string): string {
   return `${GOOGLE_AUTHORIZE_URL}?${params.toString()}`;
 }
 
+function stateCookieName(state: string): string | null {
+  if (!/^[A-Za-z0-9_-]{40,64}$/.test(state)) return null;
+  return `${GMAIL_STATE_COOKIE_PREFIX}${state}`;
+}
+
 export function setOAuthStateCookie(response: NextResponse, state: string): void {
-  response.cookies.set(GMAIL_STATE_COOKIE, state, cookieOptions(600));
+  const name = stateCookieName(state);
+  if (!name) throw new Error('Invalid OAuth state format.');
+  response.cookies.set(name, state, cookieOptions(600));
 }
 
 export function validateOAuthState(request: NextRequest, returnedState: string | null): boolean {
-  const savedState = request.cookies.get(GMAIL_STATE_COOKIE)?.value;
+  const name = returnedState ? stateCookieName(returnedState) : null;
+  if (!name) return false;
+  const savedState = request.cookies.get(name)?.value;
   if (!savedState || !returnedState) return false;
   const left = Buffer.from(savedState);
   const right = Buffer.from(returnedState);
@@ -169,8 +186,9 @@ export function clearGmailSessionCookie(response: NextResponse): void {
   response.cookies.set(GMAIL_SESSION_COOKIE, '', cookieOptions(0));
 }
 
-export function clearOAuthStateCookie(response: NextResponse): void {
-  response.cookies.set(GMAIL_STATE_COOKIE, '', cookieOptions(0));
+export function clearOAuthStateCookie(response: NextResponse, state: string): void {
+  const name = stateCookieName(state);
+  if (name) response.cookies.set(name, '', cookieOptions(0));
 }
 
 export function getGmailSession(request: NextRequest): GmailSession | null {
