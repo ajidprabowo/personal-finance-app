@@ -3,12 +3,14 @@ import { NextResponse } from 'next/server';
 import {
   buildGoogleAuthorizationUrl,
   setOAuthStateCookie,
+  validateGmailSessionEncryptionKey,
 } from '@/lib/gmail-oauth-server';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
+    validateGmailSessionEncryptionKey();
     const state = randomBytes(32).toString('base64url');
     const response = NextResponse.redirect(buildGoogleAuthorizationUrl(state));
     setOAuthStateCookie(response, state);

@@ -74,6 +74,10 @@ function encryptionKey(): Buffer {
   return key;
 }
 
+export function validateGmailSessionEncryptionKey(): void {
+  encryptionKey();
+}
+
 function cookieOptions(maxAge: number) {
   return {
     httpOnly: true,
