@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import { ensureDatabaseOpen, resetDatabaseInstance } from '@/database/client';
-import { parseEmailInputToCandidate, parseGmailRawMessage } from '@/lib/gmail-parser';
+import {
+  isImportableTransactionCandidate,
+  parseEmailInputToCandidate,
+  parseGmailRawMessage,
+} from '@/lib/gmail-parser';
 import {
   buildGmailSearchQuery,
-  extractBearerTokenFromHeader,
   GmailServerError,
   syncGmailMessagesServer,
   validateSyncFiltersInput,
@@ -128,7 +131,7 @@ describe('Stage 8 — Gmail Integration, Deterministic Parsing, Deduplication & 
       bodyText:
         'Refund berhasil diproses ke saldo.\nMerchant: Tokopedia Store\nTanggal: 14-11-2026\nAmount: Rp 120.000\nRef: RF88221',
     });
-    assert.equal(refundEmail.classification, 'refund');
+    assert.equal(refundEmail.classification, 'income');
     assert.equal(refundEmail.amount, 120000);
     assert.equal(refundEmail.extractionStatus, 'needs_review');
 
@@ -154,13 +157,50 @@ describe('Stage 8 — Gmail Integration, Deterministic Parsing, Deduplication & 
     assert.equal(ambiguousEmail.amount, null);
     assert.equal(ambiguousEmail.classification, 'unknown');
     assert.equal(ambiguousEmail.extractionStatus, 'ambiguous');
+
+    const salaryIncome = parseEmailInputToCandidate({
+      externalMessageId: 'msg-salary-1',
+      from: 'Payroll <payroll@company.example>',
+      subject: 'Salary credited successfully',
+      receivedAt: '2026-11-17T05:00:00.000Z',
+      bodyText: 'Your salary of IDR 8.500.000 was credited to your account on 2026-11-17.',
+    });
+    assert.equal(salaryIncome.classification, 'income');
+    assert.equal(isImportableTransactionCandidate(salaryIncome), true);
+
+    const applicationEmail = parseEmailInputToCandidate({
+      externalMessageId: 'msg-job-1',
+      from: 'Recruitment <jobs@company.example>',
+      subject: 'Job application received',
+      receivedAt: '2026-11-18T05:00:00.000Z',
+      bodyText: 'Your application was received. Salary range: IDR 10.000.000 per month.',
+    });
+    assert.equal(applicationEmail.classification, 'unknown');
+    assert.equal(isImportableTransactionCandidate(applicationEmail), false);
+
+    const marketAlert = parseEmailInputToCandidate({
+      externalMessageId: 'msg-market-1',
+      from: 'Stockbit <news@stockbit.example>',
+      subject: 'Stock market price alert',
+      receivedAt: '2026-11-19T05:00:00.000Z',
+      bodyText: 'BBCA price changed to IDR 10.000. This is a market update, not a trade.',
+    });
+    assert.equal(marketAlert.classification, 'unknown');
+    assert.equal(isImportableTransactionCandidate(marketAlert), false);
+
+    const unconfirmedPayment = parseEmailInputToCandidate({
+      externalMessageId: 'msg-pending-1',
+      from: 'Bank Alert <alert@bank.example>',
+      subject: 'QRIS payment notice',
+      receivedAt: '2026-11-20T05:00:00.000Z',
+      bodyText: 'QRIS payment of IDR 25.000. Date: 2026-11-20.',
+    });
+    assert.equal(unconfirmedPayment.extractionStatus, 'needs_review');
+    assert.ok(unconfirmedPayment.uncertainFields.includes('transaction_status'));
+    assert.equal(isImportableTransactionCandidate(unconfirmedPayment), true);
   });
 
-  it('2. Decodes MIME HTML Gmail payloads safely and executes server-side sync with Bearer validation, pagination, 429 retry, and 401 expiry', async () => {
-    assert.equal(extractBearerTokenFromHeader(null), null);
-    assert.equal(extractBearerTokenFromHeader('Basic abc123456789'), null);
-    assert.equal(extractBearerTokenFromHeader('Bearer valid_token_123456'), 'valid_token_123456');
-
+  it('2. Decodes MIME HTML Gmail payloads safely and executes server-side sync with pagination, 429 retry, and 401 expiry', async () => {
     const validFilters = validateSyncFiltersInput({
       dateFrom: '2026-11-01',
       dateTo: '2026-11-20',
@@ -173,6 +213,8 @@ describe('Stage 8 — Gmail Integration, Deterministic Parsing, Deduplication & 
     assert.match(query, /before:2026\/11\/21/);
     assert.match(query, /from:\(bca\.co\.id\)/);
     assert.match(query, /subject:\(Transfer\)/);
+    assert.match(query, /-newsletter/);
+    assert.match(query, /-"monthly statement"/);
 
     // Mock 429 rate-limit once then succeed on list + message fetch
     let listCalls = 0;

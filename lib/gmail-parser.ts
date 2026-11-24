@@ -447,6 +447,18 @@ function detectClassification(
   uncertainClassification: boolean;
 } {
   const text = `${subject}\n${body}`;
+  const excludedContent =
+    /\b(job\s+application|application\s+received|recruitment|newsletter|unsubscribe|promotion|promo\s+code|otp|one[-\s]?time\s+password|verification\s+code|security\s+alert|new\s+login|market\s+update|price\s+alert|stock\s+market|portfolio\s+update|investment\s+news|account\s+statement|monthly\s+statement|e[-\s]?statement)\b/i.test(
+      text
+    );
+  if (excludedContent) {
+    return {
+      classification: 'unknown',
+      isCreditCardNotification: false,
+      uncertainClassification: true,
+    };
+  }
+
   const isCreditCardNotification =
     /\b(credit\s*card|kartu\s*kredit|visa|mastercard|amex|american\s+express|cc\s+alert|card\s+ending)\b/i.test(
       text
@@ -500,6 +512,15 @@ function detectClassification(
     };
   }
 
+  // Incoming money notifications that do not explicitly call themselves transfers.
+  if (/\b(money\s+received|funds\s+received|credited\s+to\s+(?:your\s+)?account|credit\s+notification|incoming\s+payment|received\s+funds|dana\s+diterima|uang\s+masuk)\b/i.test(text)) {
+    return {
+      classification: 'income',
+      isCreditCardNotification,
+      uncertainClassification: false,
+    };
+  }
+
   // 4. Transfers (internal, incoming transfer, outgoing transfer, e-wallet top up)
   const isIncomingTransfer =
     /\b(incoming\s*transfer|transfer\s*masuk|dana\s*masuk|credit\s*transfer|received\s*transfer|menerima\s*transfer)\b/i.test(
@@ -530,7 +551,6 @@ function detectClassification(
 
   // 5. Expense (debit card, credit card, QRIS, e-wallet payment, merchant receipt, bill payment)
   if (
-    isCreditCardNotification ||
     /\b(debit|payment\s*(?:successful|confirmed|receipt)|pembayaran\s*(?:berhasil|sukses)|transaksi\s*(?:berhasil|sukses)|purchase|pembelian|belanja|qris|edc|bayar|tagihan|bill\s*payment|checkout|struk|receipt|spent|charged|penarikan|withdrawal)\b/i.test(
       text
     )
@@ -597,12 +617,18 @@ export function parseEmailInputToCandidate(
     fullText,
     input.receivedAt
   );
+  const detected = detectClassification(input.subject, bodySource, institution);
   const {
-    classification,
     transferDirection,
     isCreditCardNotification,
     uncertainClassification,
-  } = detectClassification(input.subject, bodySource, institution);
+  } = detected;
+  const classification: EmailCandidateClassification =
+    detected.classification === 'refund' ? 'income' : detected.classification;
+  const transactionStatusPresent =
+    /\b(successful|succeeded|completed|confirmed|settled|paid|charged|debited|credited|received|transferred|berhasil|sukses|terkonfirmasi|terkirim|diterima|diproses|masuk|keluar)\b/i.test(
+      fullText
+    );
 
   const uncertainFields: string[] = [];
   if (amount === null || currency === null) {
@@ -618,17 +644,20 @@ export function parseEmailInputToCandidate(
   if (classification === 'unknown' || uncertainClassification) {
     uncertainFields.push('classification');
   }
-  if (classification === 'refund') {
+  if (classification === 'income' && detected.classification === 'refund') {
     uncertainFields.push('refund_mapping');
+  }
+  if (classification !== 'unknown' && !transactionStatusPresent) {
+    uncertainFields.push('transaction_status');
   }
 
   let extractionStatus: ExtractionStatus = 'ready';
-  if (amount === null || currency === null || !date || classification === 'unknown') {
+  if (classification === 'unknown') {
     extractionStatus = 'ambiguous';
   } else if (
+    amount === null || currency === null || !date ||
     uncertainFields.length > 0 ||
-    classification === 'investment' ||
-    classification === 'refund'
+    classification === 'investment'
   ) {
     extractionStatus = 'needs_review';
   }
@@ -667,6 +696,18 @@ export function parseEmailInputToCandidate(
     uncertainFields,
     notesSummary: noteParts.join(' · '),
   };
+}
+
+export function isImportableTransactionCandidate(
+  candidate: ParsedEmailTransactionCandidate
+): boolean {
+  return (
+    (candidate.classification === 'expense' ||
+      candidate.classification === 'income' ||
+      candidate.classification === 'transfer') &&
+    candidate.amount !== null &&
+    candidate.currency !== null
+  );
 }
 
 export function parseGmailRawMessage(raw: GmailRawMessage): ParsedEmailTransactionCandidate {

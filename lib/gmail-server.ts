@@ -1,5 +1,6 @@
 import { isValidDateString, shiftCalendarDays } from '@/lib/dates';
 import {
+  isImportableTransactionCandidate,
   parseGmailRawMessage,
   type GmailRawMessage,
 } from '@/lib/gmail-parser';
@@ -42,6 +43,15 @@ function sanitizeQueryToken(input: string): string {
 
 export function buildGmailSearchQuery(filters: GmailSyncFilters): string {
   const parts: string[] = [];
+  const transactionTerms =
+    '{payment pembayaran purchase pembelian belanja debit charged QRIS transfer transaksi berhasil sukses received diterima credit credited salary gaji refund refunded reimbursement payroll receipt struk mutasi topup "money received"}';
+  const excludedTerms = [
+    '-"job application"', '-recruitment', '-newsletter', '-promotion', '-promo',
+    '-OTP', '-"one-time password"', '-"verification code"', '-"security alert"',
+    '-"new login"', '-"market update"', '-"price alert"', '-"stock market"',
+    '-"portfolio update"', '-"investment news"', '-"account statement"',
+    '-"monthly statement"', '-"e-statement"',
+  ];
 
   if (isValidDateString(filters.dateFrom)) {
     parts.push(`after:${filters.dateFrom.replace(/-/g, '/')}`);
@@ -62,13 +72,9 @@ export function buildGmailSearchQuery(filters: GmailSyncFilters): string {
   }
 
   const keywords = sanitizeQueryToken(filters.keywords ?? '');
-  if (keywords) {
-    parts.push(`(${keywords})`);
-  } else {
-    parts.push(
-      '(transaction OR transaksi OR payment OR pembayaran OR transfer OR debit OR credit OR refund OR receipt OR struk OR mutasi OR order)'
-    );
-  }
+  parts.push(transactionTerms);
+  if (keywords) parts.push(`(${keywords})`);
+  parts.push(...excludedTerms);
 
   return parts.join(' ').trim();
 }
@@ -283,7 +289,8 @@ export async function syncGmailMessagesServer(
     for (const outcome of settled) {
       if (outcome.status === 'fulfilled') {
         try {
-          candidates.push(parseGmailRawMessage(outcome.value));
+          const candidate = parseGmailRawMessage(outcome.value);
+          if (isImportableTransactionCandidate(candidate)) candidates.push(candidate);
         } catch {
           failedCount += 1;
         }
