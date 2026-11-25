@@ -53,6 +53,7 @@ import { formatDisplayDate, getPeriodDateRange, type ReportingPeriodPreset } fro
 import { cn } from '@/lib/utils';
 import {
   deleteValuationSnapshot,
+  deleteHolding,
   ensureInvestmentPoolAccount,
   getInvestmentOverviewSnapshot,
   getInvestmentPoolSummary,
@@ -426,6 +427,28 @@ export function InvestmentsView() {
       await triggerReload();
     } catch (err) {
       notifyError('Failed to delete snapshot', err);
+    }
+  };
+
+  const handleDeleteHolding = async (holdingItem: HoldingEnriched) => {
+    const holding = holdingItem.holding;
+    const platformName = overview?.platforms.find((item) => item.platform.id === holding.platformId)?.platform.name ?? 'Unknown platform';
+    const ok = await confirm({
+      title: `Delete ${holding.symbol}?`,
+      description: `Permanently delete ${holding.symbol} (${holding.name}) from ${platformName}? This removes the holding record and its related price history.`,
+      details: ['This action cannot be undone.', 'Deletion is allowed only when quantity is zero and no buy, sell, dividend, or fee activity is linked.'],
+      confirmLabel: 'Delete Holding',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteHolding(holding.id);
+      notifySuccess(`${holding.symbol} deleted.`);
+      setHoldingModalOpen(false);
+      setEditingHolding(null);
+      await triggerReload();
+    } catch (err) {
+      notifyError('Failed to delete holding', err);
     }
   };
 
@@ -1976,6 +1999,7 @@ export function InvestmentsView() {
             assetClasses={allAssetClasses}
             initialPlatformId={holdingModalPlatformId}
             editingHolding={editingHolding}
+            onDelete={handleDeleteHolding}
           />
 
           <TradeOrIncomeModal

@@ -23,6 +23,7 @@ import {
   createInvestmentPlatformWithCashAccount,
   createValuationSnapshot,
   deleteInvestmentActivity,
+  deleteHolding,
   ensureInvestmentPoolAccount,
   getInvestmentOverviewSnapshot,
   getInvestmentPoolSummary,
@@ -592,6 +593,31 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
     const usClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
     const stock = await createHolding({ symbol: 'AAPL', name: 'Apple', platformId: broker.id, assetClassId: usClass.id, currency: 'USD' });
     await assert.rejects(() => recordBuyActivity({ platformId: broker.id, holdingId: stock.id, quantity: 1, unitPrice: 100, activityDate: '2026-11-20' }), /Missing manual FX rate/);
+  });
+
+  it('6c. Deletes only an unused zero-quantity holding and its own price history', async () => {
+    const platform = await createInvestmentPlatformWithCashAccount({ name: 'Delete Test Broker', kind: 'brokerage', defaultCurrency: 'USD' });
+    const usClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
+    const safeHolding = await createHolding({ symbol: 'SAFE', name: 'Safe Holding', platformId: platform.id, assetClassId: usClass.id, currency: 'USD' });
+    const otherHolding = await createHolding({ symbol: 'KEEP', name: 'Keep Holding', platformId: platform.id, assetClassId: usClass.id, currency: 'USD' });
+    const price = await createValuationSnapshot({ scope: 'holding', holdingId: safeHolding.id, platformId: platform.id, valuationDate: '2026-11-20', marketValue: 0, currency: 'USD' });
+    await createValuationSnapshot({ scope: 'holding', holdingId: otherHolding.id, platformId: platform.id, valuationDate: '2026-11-20', marketValue: 10, currency: 'USD' });
+    await recordFeeActivity({ platformId: platform.id, holdingId: otherHolding.id, amount: 1, activityDate: '2026-11-21' });
+
+    await assert.rejects(() => deleteHolding(otherHolding.id), /buy, sell, dividend, or fee activity/);
+    await deleteHolding(safeHolding.id);
+    assert.equal(await holdingsRepository.getById(safeHolding.id), undefined);
+    assert.equal(await portfolioValuationsRepository.getById(price.id), undefined);
+    assert.ok(await holdingsRepository.getById(otherHolding.id));
+    assert.equal((await portfolioValuationsRepository.getByOriginSorted('user')).length, 1);
+  });
+
+  it('6d. Blocks holding deletion while quantity is non-zero', async () => {
+    const platform = await createInvestmentPlatformWithCashAccount({ name: 'Quantity Guard Broker', kind: 'brokerage', defaultCurrency: 'USD', initialCashBalance: 500 });
+    const usClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
+    const holding = await createHolding({ symbol: 'OPEN', name: 'Open Holding', platformId: platform.id, assetClassId: usClass.id, currency: 'USD' });
+    await recordBuyActivity({ platformId: platform.id, holdingId: holding.id, quantity: 1, unitPrice: 50 });
+    await assert.rejects(() => deleteHolding(holding.id), /quantity must be zero/);
   });
 
   it('7. Controlled Replay on Edit/Delete, Oversold Rollback, Duplicate Rules, and Validator Integrity', async () => {

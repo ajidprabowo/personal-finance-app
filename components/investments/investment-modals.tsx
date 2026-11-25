@@ -19,6 +19,7 @@ import {
   computeSellPositionUpdate,
   createAssetClass,
   createHolding,
+  deleteHolding,
   createInvestmentPlatformWithCashAccount,
   createValuationSnapshot,
   deleteInvestmentActivity,
@@ -385,6 +386,7 @@ export interface HoldingModalProps {
   assetClasses: AssetClass[];
   initialPlatformId?: string;
   editingHolding?: HoldingEnriched | null;
+  onDelete?: (holding: HoldingEnriched) => Promise<void> | void;
 }
 
 function HoldingFormBody({
@@ -394,6 +396,7 @@ function HoldingFormBody({
   assetClasses,
   initialPlatformId,
   editingHolding,
+  onDelete,
 }: Omit<HoldingModalProps, 'open'>) {
   const { notifySuccess } = useNotifications();
   const isEditing = Boolean(editingHolding);
@@ -526,13 +529,23 @@ function HoldingFormBody({
         placeholder="Thesis, custody notes, or lot details"
       />
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
+        <div>
+          {isEditing && editingHolding && onDelete ? (
+            <Button type="button" variant="danger" size="sm" disabled={saving}
+              onClick={() => void onDelete(editingHolding)}>
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose} disabled={saving}>
           Cancel
         </Button>
         <Button type="submit" loading={saving}>
           {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Holding'}
         </Button>
+        </div>
       </div>
     </form>
   );
@@ -554,6 +567,7 @@ export function HoldingModal(props: HoldingModalProps) {
         assetClasses={props.assetClasses}
         initialPlatformId={props.initialPlatformId}
         editingHolding={props.editingHolding}
+        onDelete={props.onDelete}
       />
     </Modal>
   );

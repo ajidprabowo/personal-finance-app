@@ -1,6 +1,7 @@
 import { APP_CONFIG } from '@/lib/config';
 import { roundCurrencyAmount } from '@/lib/currency';
 import { ValidationError } from '@/lib/errors';
+import { ensureDatabaseOpen } from '@/database/client';
 import { roundUnitPrice } from '@/lib/precision';
 import {
   assetClassesRepository,
@@ -158,6 +159,38 @@ export async function updateHoldingMetadata(
     assetClassId: patch.assetClassId ?? existing.assetClassId,
     notes: patch.notes !== undefined ? patch.notes.trim() || undefined : existing.notes,
     isArchived: patch.isArchived ?? existing.isArchived,
+  });
+}
+
+/** Permanently removes an unused holding and only its own valuation history. */
+export async function deleteHolding(
+  id: string,
+  options?: { recordOrigin?: RecordOrigin }
+): Promise<void> {
+  const origin = options?.recordOrigin ?? 'user';
+  const db = await ensureDatabaseOpen();
+  await db.transaction('rw', [db.holdings, db.investmentActivities, db.portfolioValuations], async () => {
+    const holding = await db.holdings.get(id);
+    if (!holding || holding.recordOrigin !== origin) {
+      throw new ValidationError('Holding record not found.');
+    }
+    if (holding.quantity !== 0) {
+      throw new ValidationError(`Cannot delete ${holding.symbol}: its quantity must be zero first.`);
+    }
+
+    const activities = await db.investmentActivities.toArray();
+    const blockingTypes = new Set(['buy', 'sell', 'partial_sell', 'dividend', 'fee']);
+    if (activities.some((activity) => activity.holdingId === id && activity.recordOrigin === origin && blockingTypes.has(activity.activityType))) {
+      throw new ValidationError(
+        `Cannot delete ${holding.symbol}: it has related buy, sell, dividend, or fee activity records.`
+      );
+    }
+
+    const valuations = await db.portfolioValuations.where('holdingId').equals(id).toArray();
+    await db.portfolioValuations.bulkDelete(
+      valuations.filter((valuation) => valuation.recordOrigin === origin).map((valuation) => valuation.id)
+    );
+    await db.holdings.delete(id);
   });
 }
 
