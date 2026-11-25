@@ -36,13 +36,7 @@ const EN_DICTIONARY = {
 
   // Reporting periods
   'period.this_month': 'This Month',
-  'period.last_month': 'Last Month',
-  'period.last_3_months': 'Last 3 Months',
-  'period.last_6_months': 'Last 6 Months',
   'period.this_year': 'This Year',
-  'period.last_year': 'Last Year',
-  'period.last_12_months': 'Last 12 Months',
-  'period.all_time': 'All Time',
   'period.custom': 'Custom Range',
 
   // Page Titles & Subtitles
@@ -141,13 +135,7 @@ const ID_DICTIONARY: Record<I18nKey, string> = {
 
   // Reporting periods
   'period.this_month': 'Bulan Ini',
-  'period.last_month': 'Bulan Lalu',
-  'period.last_3_months': '3 Bulan Terakhir',
-  'period.last_6_months': '6 Bulan Terakhir',
   'period.this_year': 'Tahun Ini',
-  'period.last_year': 'Tahun Lalu',
-  'period.last_12_months': '12 Bulan Terakhir',
-  'period.all_time': 'Semua Waktu',
   'period.custom': 'Rentang Kustom',
 
   // Page Titles & Subtitles

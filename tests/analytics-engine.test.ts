@@ -184,7 +184,7 @@ describe('Stage 6 — Financial Analytics Engine & v6 Migration', () => {
 
     // Empty state first
     const emptySnap = await getAnalyticsSnapshot({
-      periodPreset: 'last_12_months',
+      periodPreset: 'this_year',
       todayOverride: '2026-11-20',
     });
     assert.equal(emptySnap.overview.totalIncome, 0);

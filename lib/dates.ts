@@ -3,18 +3,23 @@ import type { DateFormatPreference } from '@/types/entities';
 
 export type ReportingPeriodPreset =
   | 'this_month'
-  | 'last_month'
-  | 'last_3_months'
-  | 'last_6_months'
   | 'this_year'
-  | 'last_year'
-  | 'last_12_months'
-  | 'all_time'
   | 'custom';
 
 export interface DateRange {
   startDate: string | null;
   endDate: string | null;
+}
+
+export function isValidDateRange(range: DateRange): boolean {
+  return !(range.startDate && range.endDate && range.startDate > range.endDate);
+}
+
+export function validateDateRange(range: DateRange): DateRange {
+  if (!isValidDateRange(range)) {
+    throw new Error('Start date must be on or before end date.');
+  }
+  return range;
 }
 
 const MONTH_SHORT_NAMES = [
@@ -132,16 +137,9 @@ export function getPeriodDateRange(
     todayOverride?: string;
   }
 ): DateRange {
-  if (preset === 'all_time') {
-    return { startDate: null, endDate: null };
-  }
-
   if (preset === 'custom') {
     const start = isValidDateString(options?.customStart) ? options!.customStart : null;
     const end = isValidDateString(options?.customEnd) ? options!.customEnd : null;
-    if (start && end && start > end) {
-      return { startDate: end, endDate: start };
-    }
     return { startDate: start, endDate: end };
   }
 
@@ -160,42 +158,6 @@ export function getPeriodDateRange(
     return { startDate, endDate };
   }
 
-  if (preset === 'last_month') {
-    const prev = subtractMonthsFromYearMonth(year, month, 1);
-    const startDate = `${prev.year}-${pad2(prev.month)}-01`;
-    const endDate = `${prev.year}-${pad2(prev.month)}-${pad2(daysInMonth(prev.year, prev.month))}`;
-    return { startDate, endDate };
-  }
-
-  if (preset === 'last_3_months') {
-    const start = subtractMonthsFromYearMonth(year, month, 2);
-    const startDate = `${start.year}-${pad2(start.month)}-01`;
-    const endDate = `${year}-${pad2(month)}-${pad2(daysInMonth(year, month))}`;
-    return { startDate, endDate };
-  }
-
-  if (preset === 'last_6_months') {
-    const start = subtractMonthsFromYearMonth(year, month, 5);
-    const startDate = `${start.year}-${pad2(start.month)}-01`;
-    const endDate = `${year}-${pad2(month)}-${pad2(daysInMonth(year, month))}`;
-    return { startDate, endDate };
-  }
-
-  if (preset === 'last_12_months') {
-    const start = subtractMonthsFromYearMonth(year, month, 11);
-    const startDate = `${start.year}-${pad2(start.month)}-01`;
-    const endDate = `${year}-${pad2(month)}-${pad2(daysInMonth(year, month))}`;
-    return { startDate, endDate };
-  }
-
-  if (preset === 'last_year') {
-    const prevYear = year - 1;
-    return {
-      startDate: `${prevYear}-01-01`,
-      endDate: `${prevYear}-12-31`,
-    };
-  }
-
   // this_year
   return {
     startDate: `${year}-01-01`,
@@ -205,18 +167,17 @@ export function getPeriodDateRange(
 
 /**
  * Computes the immediately preceding equivalent calendar period for safe period-over-period comparisons.
- * Returns null when comparison is undefined (e.g., all_time or open-ended custom range).
+ * Returns null when comparison is undefined for an open-ended custom range.
  */
 export function getPreviousEquivalentPeriodRange(
   preset: ReportingPeriodPreset,
   currentRange: DateRange
 ): DateRange | null {
-  if (preset === 'all_time') return null;
   if (!currentRange.startDate || !currentRange.endDate) return null;
 
   const [startYear, startMonth] = currentRange.startDate.split('-').map(Number);
 
-  if (preset === 'this_month' || preset === 'last_month') {
+  if (preset === 'this_month') {
     const prev = subtractMonthsFromYearMonth(startYear, startMonth, 1);
     return {
       startDate: `${prev.year}-${pad2(prev.month)}-01`,
@@ -224,34 +185,7 @@ export function getPreviousEquivalentPeriodRange(
     };
   }
 
-  if (preset === 'last_3_months') {
-    const prevStart = subtractMonthsFromYearMonth(startYear, startMonth, 3);
-    const prevEnd = subtractMonthsFromYearMonth(startYear, startMonth, 1);
-    return {
-      startDate: `${prevStart.year}-${pad2(prevStart.month)}-01`,
-      endDate: `${prevEnd.year}-${pad2(prevEnd.month)}-${pad2(daysInMonth(prevEnd.year, prevEnd.month))}`,
-    };
-  }
-
-  if (preset === 'last_6_months') {
-    const prevStart = subtractMonthsFromYearMonth(startYear, startMonth, 6);
-    const prevEnd = subtractMonthsFromYearMonth(startYear, startMonth, 1);
-    return {
-      startDate: `${prevStart.year}-${pad2(prevStart.month)}-01`,
-      endDate: `${prevEnd.year}-${pad2(prevEnd.month)}-${pad2(daysInMonth(prevEnd.year, prevEnd.month))}`,
-    };
-  }
-
-  if (preset === 'last_12_months') {
-    const prevStart = subtractMonthsFromYearMonth(startYear, startMonth, 12);
-    const prevEnd = subtractMonthsFromYearMonth(startYear, startMonth, 1);
-    return {
-      startDate: `${prevStart.year}-${pad2(prevStart.month)}-01`,
-      endDate: `${prevEnd.year}-${pad2(prevEnd.month)}-${pad2(daysInMonth(prevEnd.year, prevEnd.month))}`,
-    };
-  }
-
-  if (preset === 'this_year' || preset === 'last_year') {
+  if (preset === 'this_year') {
     const prevYear = startYear - 1;
     return {
       startDate: `${prevYear}-01-01`,

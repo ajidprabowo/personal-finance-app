@@ -1,4 +1,5 @@
 import { APP_CONFIG } from '@/lib/config';
+import { ValidationError } from '@/lib/errors';
 import { roundCurrencyAmount } from '@/lib/currency';
 import {
   getPeriodDateRange,
@@ -48,7 +49,7 @@ export function calculateFinancialSummary(
     primaryCurrency?: string;
   }
 ): FinancialSummarySnapshot {
-  const periodPreset = options?.periodPreset ?? 'all_time';
+  const periodPreset = options?.periodPreset ?? 'this_month';
   const dateRange = options?.dateRange ?? { startDate: null, endDate: null };
   const primaryCurrency = (options?.primaryCurrency ?? APP_CONFIG.defaultCurrency).toUpperCase();
 
@@ -154,6 +155,10 @@ export async function getFinancialSummaryForPeriod(options: {
   let timezone = options.timezone;
   let primaryCurrency = options.primaryCurrency;
 
+  if (options.preset === 'custom' && options.customStart && options.customEnd && options.customStart > options.customEnd) {
+    throw new ValidationError('Start date must be on or before end date.');
+  }
+
   if (!timezone || !primaryCurrency) {
     const allPrefs = await preferencesRepository.getAll();
     const pref = allPrefs[0];
@@ -166,6 +171,9 @@ export async function getFinancialSummaryForPeriod(options: {
     customStart: options.customStart,
     customEnd: options.customEnd,
   });
+  if (options.preset === 'custom' && dateRange.startDate && dateRange.endDate && dateRange.startDate > dateRange.endDate) {
+    throw new ValidationError('Start date must be on or before end date.');
+  }
 
   const transactions = await transactionsRepository.getByOriginAndDateRange(
     origin,

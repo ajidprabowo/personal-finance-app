@@ -32,11 +32,11 @@ import {
   SavingsMonthlyTrendChart,
 } from '@/components/analytics/analytics-charts';
 import { AppLayout } from '@/components/layout/app-layout';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useI18n } from '@/hooks/use-i18n';
@@ -56,18 +56,6 @@ import {
   type AnalyticsSnapshot,
   type HealthIndicatorStatus,
 } from '@/services/analytics.service';
-
-const PERIOD_OPTIONS: Array<{ value: ReportingPeriodPreset; label: string }> = [
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'last_3_months', label: 'Last 3 Months' },
-  { value: 'last_6_months', label: 'Last 6 Months' },
-  { value: 'this_year', label: 'This Year' },
-  { value: 'last_year', label: 'Last Year' },
-  { value: 'last_12_months', label: 'Last 12 Months' },
-  { value: 'all_time', label: 'All Time' },
-  { value: 'custom', label: 'Custom Range' },
-];
 
 type AnalyticsSectionTab =
   | 'all'
@@ -115,9 +103,9 @@ function healthStatusStyles(status: HealthIndicatorStatus): {
 export function AnalyticsView() {
   const router = useRouter();
   const { preferences } = useBootstrap();
-  const { t, periodLabel } = useI18n();
+  const { t } = useI18n();
 
-  const [periodPreset, setPeriodPreset] = useState<ReportingPeriodPreset>('last_6_months');
+  const [periodPreset, setPeriodPreset] = useState<ReportingPeriodPreset>('this_month');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
   const [accountId, setAccountId] = useState<string>('all');
@@ -223,7 +211,7 @@ export function AnalyticsView() {
   }, [loadSnapshot]);
 
   const resetFilters = () => {
-    setPeriodPreset('last_6_months');
+    setPeriodPreset('this_month');
     setCustomStart('');
     setCustomEnd('');
     setAccountId('all');
@@ -289,15 +277,9 @@ export function AnalyticsView() {
               <span>Analytics Filters</span>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-              <Select
-                label="Reporting Period"
-                value={periodPreset}
-                onChange={(e) => setPeriodPreset(e.target.value as ReportingPeriodPreset)}
-                options={PERIOD_OPTIONS.map((opt) => ({
-                  value: opt.value,
-                  label: periodLabel(opt.value),
-                }))}
-              />
+              <DateRangeFilter value={periodPreset} onPresetChange={setPeriodPreset}
+                startDate={customStart} endDate={customEnd}
+                onStartDateChange={setCustomStart} onEndDateChange={setCustomEnd} />
               <Select
                 label="Account"
                 value={accountId}
@@ -362,18 +344,6 @@ export function AnalyticsView() {
 
             {periodPreset === 'custom' ? (
               <div className="mt-3 grid grid-cols-1 gap-3 border-t border-line pt-3 sm:grid-cols-3">
-                <Input
-                  label="Start Date"
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                />
-                <Input
-                  label="End Date"
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                />
                 <Select
                   label="Holding Filter"
                   value={holdingId}

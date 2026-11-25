@@ -11,6 +11,7 @@ import {
   type ReportingPeriodPreset,
 } from '@/lib/dates';
 import { addDecimal } from '@/lib/precision';
+import { ValidationError } from '@/lib/errors';
 import { resolveDefaultChartInterval, type TrendInterval } from '@/services/dashboard-chart.service';
 import {
   convertCurrencyWithManualRate,
@@ -55,7 +56,10 @@ export function resolveAnalyticsContext(
   options: AnalyticsFilterOptions,
   defaults: { baseCurrency?: string; timezone?: string; firstDayOfWeek?: 'monday' | 'sunday' }
 ): ResolvedAnalyticsContext {
-  const periodPreset: ReportingPeriodPreset = options.periodPreset ?? 'last_6_months';
+  if (options.periodPreset === 'custom' && options.customStart && options.customEnd && options.customStart > options.customEnd) {
+    throw new ValidationError('Start date must be on or before end date.');
+  }
+  const periodPreset: ReportingPeriodPreset = options.periodPreset ?? 'this_month';
   const timezone = defaults.timezone ?? APP_CONFIG.defaultTimezone;
   const today = options.todayOverride ?? getTodayInTimezone(timezone);
   const baseCurrency = (
@@ -70,6 +74,9 @@ export function resolveAnalyticsContext(
     customEnd: options.customEnd,
     todayOverride: today,
   });
+  if (periodPreset === 'custom' && dateRange.startDate && dateRange.endDate && dateRange.startDate > dateRange.endDate) {
+    throw new ValidationError('Start date must be on or before end date.');
+  }
   const previousDateRange = getPreviousEquivalentPeriodRange(periodPreset, dateRange);
   const interval = options.interval ?? resolveDefaultChartInterval(periodPreset, dateRange);
 

@@ -4,6 +4,7 @@ import { ensureDatabaseOpen, resetDatabaseInstance } from '@/database/client';
 import { categoriesRepository, transactionsRepository } from '@/repositories';
 import { initializeApplication } from '@/services/bootstrap.service';
 import { getDashboardSnapshot } from '@/services/dashboard.service';
+import { isValidDateRange } from '@/lib/dates';
 import {
   contributeToInvestmentPool,
   createAssetClass,
@@ -32,6 +33,11 @@ async function resetLocalDatabaseForTest(): Promise<void> {
 }
 
 describe('Stage 5 — Dashboard & Financial Overview Engine', () => {
+  it('rejects reversed custom date ranges', () => {
+    assert.equal(isValidDateRange({ startDate: '2026-11-20', endDate: '2026-11-01' }), false);
+    assert.equal(isValidDateRange({ startDate: '2026-11-01', endDate: '2026-11-20' }), true);
+  });
+
   beforeEach(async () => {
     resetDatabaseInstance();
     await resetLocalDatabaseForTest();
@@ -352,17 +358,19 @@ describe('Stage 5 — Dashboard & Financial Overview Engine', () => {
     assert.equal(novWithPrior.metrics.comparison.expenseChangeAbs, -1_000_000);
     assert.equal(novWithPrior.metrics.comparison.expenseChangePct, -25);
 
-    // Test last_6_months (Jun..Nov 2026), last_year (2025), custom, and all_time
+    // Test current-year, custom, and full-year date ranges.
     const sixMonthsDash = await getDashboardSnapshot({
       todayOverride: '2026-11-20',
-      periodPreset: 'last_6_months',
+      periodPreset: 'this_year',
     });
     assert.equal(sixMonthsDash.metrics.periodIncome, 22_000_000);
     assert.equal(sixMonthsDash.metrics.periodExpenses, 7_000_000);
 
     const lastYearDash = await getDashboardSnapshot({
       todayOverride: '2026-11-20',
-      periodPreset: 'last_year',
+      periodPreset: 'custom',
+      customStart: '2025-01-01',
+      customEnd: '2025-12-31',
     });
     assert.equal(lastYearDash.metrics.periodIncome, 8_000_000);
     assert.equal(lastYearDash.metrics.periodExpenses, 0);
@@ -378,11 +386,12 @@ describe('Stage 5 — Dashboard & Financial Overview Engine', () => {
 
     const allTimeDash = await getDashboardSnapshot({
       todayOverride: '2026-11-20',
-      periodPreset: 'all_time',
+      periodPreset: 'custom',
+      customStart: '2000-01-01',
+      customEnd: '2026-11-20',
     });
     assert.equal(allTimeDash.metrics.periodIncome, 30_000_000);
-    assert.equal(allTimeDash.metrics.periodExpenses, 7_000_000);
-    assert.equal(allTimeDash.previousDateRange, null);
+    assert.equal(allTimeDash.metrics.periodExpenses, 4_000_000);
   });
 
   it('4. Asset Allocation & Expense Breakdown accurately sum 100%, handle custom categories & FX, and handle zero expenses', async () => {

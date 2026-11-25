@@ -135,17 +135,8 @@ export function resolveDefaultChartInterval(
   preset: ReportingPeriodPreset,
   range: DateRange
 ): TrendInterval {
-  if (preset === 'this_month' || preset === 'last_month') return 'daily';
-  if (preset === 'last_3_months') return 'weekly';
-  if (
-    preset === 'last_6_months' ||
-    preset === 'last_12_months' ||
-    preset === 'this_year' ||
-    preset === 'last_year' ||
-    preset === 'all_time'
-  ) {
-    return 'monthly';
-  }
+  if (preset === 'this_month') return 'daily';
+  if (preset === 'this_year') return 'monthly';
   if (range.startDate && range.endDate) {
     const diff = calendarDayDiff(range.startDate, range.endDate);
     if (diff <= 45) return 'daily';

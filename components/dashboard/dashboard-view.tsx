@@ -29,6 +29,7 @@ import {
   type NetWorthSeriesKey,
 } from '@/components/dashboard/dashboard-charts';
 import { AppLayout } from '@/components/layout/app-layout';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { PageContainer } from '@/components/layout/page-container';
 import { TransactionDetailModal } from '@/components/transactions/transaction-detail-modal';
 import { TransactionFormModal } from '@/components/transactions/transaction-form-modal';
@@ -62,17 +63,6 @@ import type { TrendInterval } from '@/services/dashboard-chart.service';
 import { listUserAccounts, listUserCategoriesWithCounts } from '@/services/settings.service';
 import type { EnrichedTransactionItem } from '@/services/transaction.service';
 import type { Account, AccountType, Category, Transaction } from '@/types/entities';
-
-const PERIOD_OPTIONS: Array<{ value: ReportingPeriodPreset; label: string }> = [
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'last_3_months', label: 'Last 3 Months' },
-  { value: 'last_6_months', label: 'Last 6 Months' },
-  { value: 'this_year', label: 'This Year' },
-  { value: 'last_year', label: 'Last Year' },
-  { value: 'all_time', label: 'All Time' },
-  { value: 'custom', label: 'Custom Range' },
-];
 
 const INTERVAL_OPTIONS: Array<{ value: TrendInterval; label: string }> = [
   { value: 'daily', label: 'Daily' },
@@ -178,7 +168,7 @@ export function DashboardView() {
     () => false
   );
   const { preferences } = useBootstrap();
-  const { language, t, periodLabel } = useI18n();
+  const { language, t } = useI18n();
   const { notifyError } = useNotifications();
 
   const timezone = preferences?.timezone ?? APP_CONFIG.defaultTimezone;
@@ -335,10 +325,6 @@ export function DashboardView() {
     };
   }, [snapshot]);
 
-  const localizedPeriodOptions = useMemo(
-    () => PERIOD_OPTIONS.map((opt) => ({ value: opt.value, label: periodLabel(opt.value) })),
-    [periodLabel]
-  );
 
   const greetingTitle = !isClient
     ? t('page.dashboard.overview')
@@ -375,45 +361,13 @@ export function DashboardView() {
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
-            <div className="w-44">
-              <Select
-                label="Reporting Period"
-                value={periodPreset}
-                onChange={(e) => {
-                  const next = e.target.value as ReportingPeriodPreset;
-                  setPeriodPreset(next);
-                  setTrendIntervalOverride(null);
-                  setCashflowIntervalOverride(null);
-                  setExpenseCategoryFilter('all');
-                }}
-                options={localizedPeriodOptions}
-              />
+            <div className="flex flex-wrap items-end gap-2">
+              <DateRangeFilter value={periodPreset} startDate={customStart} endDate={customEnd}
+                onPresetChange={setPeriodPreset}
+                onPresetSelect={() => { setTrendIntervalOverride(null); setCashflowIntervalOverride(null); setExpenseCategoryFilter('all'); }}
+                onStartDateChange={setCustomStart} onEndDateChange={setCustomEnd}
+                className="flex flex-wrap items-end gap-2" />
             </div>
-
-            {periodPreset === 'custom' ? (
-              <div className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink">Start</label>
-                  <input
-                    type="date"
-                    aria-label="Custom start date"
-                    value={customStart}
-                    onChange={(e) => setCustomStart(e.target.value)}
-                    className="h-10 rounded-lg border border-line bg-surface px-3 text-xs tabular-nums text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-ink">End</label>
-                  <input
-                    type="date"
-                    aria-label="Custom end date"
-                    value={customEnd}
-                    onChange={(e) => setCustomEnd(e.target.value)}
-                    className="h-10 rounded-lg border border-line bg-surface px-3 text-xs tabular-nums text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                  />
-                </div>
-              </div>
-            ) : null}
 
             <Button
               variant="outline"
@@ -524,7 +478,7 @@ export function DashboardView() {
                         snapshot.dateRange.endDate,
                         dateFormat
                       )})`
-                    : ' (All Time)'}
+                    : ''}
                   .
                 </span>
               </div>

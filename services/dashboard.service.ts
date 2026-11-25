@@ -1,6 +1,7 @@
 import { liveQuery } from 'dexie';
 import { ensureDatabaseOpen, getDatabase } from '@/database/client';
 import { APP_CONFIG } from '@/lib/config';
+import { ValidationError } from '@/lib/errors';
 import { roundCurrencyAmount } from '@/lib/currency';
 import {
   getPeriodDateRange,
@@ -215,6 +216,9 @@ export async function getDashboardSnapshot(
     customEnd: options.customEnd,
     todayOverride: options.todayOverride,
   });
+  if (periodPreset === 'custom' && dateRange.startDate && dateRange.endDate && dateRange.startDate > dateRange.endDate) {
+    throw new ValidationError('Start date must be on or before end date.');
+  }
   const previousDateRange = getPreviousEquivalentPeriodRange(periodPreset, dateRange);
 
   // 1. Unified Point-in-Time Net Worth (reusing Stage 3/4 balance engine)

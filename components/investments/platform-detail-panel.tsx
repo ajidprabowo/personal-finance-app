@@ -5,10 +5,11 @@ import { ArrowLeft, Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { useNotifications } from '@/hooks/use-notifications';
 import { formatCurrency, formatNumericValue } from '@/lib/currency';
 import { formatSensitiveNumber, formatSensitiveSignedNumber } from '@/lib/privacy-mode';
-import { formatDisplayDate } from '@/lib/dates';
+import { formatDisplayDate, getPeriodDateRange, type ReportingPeriodPreset } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import type { HoldingEnriched } from '@/services/holding.service';
 import {
@@ -51,15 +52,17 @@ export function PlatformDetailPanel({
   const [detail, setDetail] = useState<PlatformDetailSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [activityType, setActivityType] = useState<InvestmentActivityType | 'all'>('all');
+  const [datePreset, setDatePreset] = useState<ReportingPeriodPreset>('this_month');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const dateRange = getPeriodDateRange(datePreset, { customStart: startDate, customEnd: endDate });
 
   useEffect(() => {
     let active = true;
     getPlatformDetail(platformId, {
       activityType,
-      startDate: startDate || null,
-      endDate: endDate || null,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
       recordOrigin: 'user',
     })
       .then((res) => {
@@ -75,7 +78,7 @@ export function PlatformDetailPanel({
     return () => {
       active = false;
     };
-  }, [platformId, activityType, startDate, endDate, reloadKey, notifyError]);
+  }, [platformId, activityType, datePreset, startDate, endDate, reloadKey, notifyError]);
 
   if (loading && !detail) {
     return (
@@ -312,20 +315,10 @@ export function PlatformDetailPanel({
                 ]}
               />
             </div>
-            <input
-              type="date"
-              aria-label="Filter start date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-10 rounded-lg border border-line bg-surface px-3 text-xs tabular-nums text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-            />
-            <input
-              type="date"
-              aria-label="Filter end date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="h-10 rounded-lg border border-line bg-surface px-3 text-xs tabular-nums text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-            />
+            <DateRangeFilter value={datePreset} onPresetChange={setDatePreset}
+              startDate={startDate} endDate={endDate}
+              onStartDateChange={setStartDate} onEndDateChange={setEndDate}
+              className="flex flex-wrap items-end gap-2" />
           </div>
         </div>
 

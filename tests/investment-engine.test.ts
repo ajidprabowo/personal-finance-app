@@ -118,7 +118,7 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
     assert.equal(poolSummary.totalsByCurrency.IDR.totalTransferredToPlatforms, 15_000_000);
 
     // Stage 3 personal income/expense summary must remain strictly unaffected by investment transfers
-    const finSummary = await getFinancialSummaryForPeriod({ preset: 'all_time' });
+    const finSummary = await getFinancialSummaryForPeriod({ preset: 'custom', customStart: '2000-01-01', customEnd: '2099-12-31' });
     assert.equal(finSummary.byCurrency.IDR?.totalIncome ?? 0, 0);
     assert.equal(finSummary.byCurrency.IDR?.totalExpenses ?? 0, 0);
   });
@@ -471,7 +471,7 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
     assert.equal(overview.netWorth.byCurrency.IDR.totalNetWorth, 11_300_000);
 
     // Personal income/expense totals remain 0
-    const fin = await getFinancialSummaryForPeriod({ preset: 'all_time' });
+    const fin = await getFinancialSummaryForPeriod({ preset: 'custom', customStart: '2000-01-01', customEnd: '2099-12-31' });
     assert.equal(fin.byCurrency.IDR?.totalIncome ?? 0, 0);
     assert.equal(fin.byCurrency.IDR?.totalExpenses ?? 0, 0);
 

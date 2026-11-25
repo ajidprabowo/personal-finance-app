@@ -631,7 +631,7 @@ export async function getAnalyticsSnapshot(
           context.dateRange.endDate,
           dateFormat
         )}`
-      : 'All Time';
+      : 'Select a date range';
 
   const healthIndicators = buildFinancialHealthIndicators({
     baseCurrency: context.baseCurrency,

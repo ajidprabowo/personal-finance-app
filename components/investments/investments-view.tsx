@@ -39,6 +39,7 @@ import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Select } from '@/components/ui/select';
 import { useBootstrap } from '@/hooks/use-bootstrap';
@@ -48,7 +49,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { APP_CONFIG } from '@/lib/config';
 import { formatCurrency, formatNumericValue } from '@/lib/currency';
 import { formatSensitiveSignedNumber } from '@/lib/privacy-mode';
-import { formatDisplayDate } from '@/lib/dates';
+import { formatDisplayDate, getPeriodDateRange, type ReportingPeriodPreset } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import {
   deleteValuationSnapshot,
@@ -137,8 +138,12 @@ export function InvestmentsView() {
   const [activityTypeFilter, setActivityTypeFilter] = useState<InvestmentActivityType | 'all'>(
     'all'
   );
+  const [activityDatePreset, setActivityDatePreset] = useState<ReportingPeriodPreset>('this_month');
   const [activityStartDate, setActivityStartDate] = useState<string>('');
   const [activityEndDate, setActivityEndDate] = useState<string>('');
+  const resolvedActivityRange = getPeriodDateRange(activityDatePreset, {
+    timezone, customStart: activityStartDate, customEnd: activityEndDate,
+  });
   const [activitySortOrder, setActivitySortOrder] = useState<'newest' | 'oldest'>('newest');
   const [filteredActivities, setFilteredActivities] = useState<EnrichedInvestmentActivity[]>([]);
 
@@ -196,8 +201,8 @@ export function InvestmentsView() {
         platformId: activityPlatformFilter,
         assetClassId: activityClassFilter,
         activityType: activityTypeFilter,
-        startDate: activityStartDate || null,
-        endDate: activityEndDate || null,
+        startDate: resolvedActivityRange.startDate,
+        endDate: resolvedActivityRange.endDate,
         sortOrder: activitySortOrder,
       }),
     ]);
@@ -217,6 +222,7 @@ export function InvestmentsView() {
     activityTypeFilter,
     activityStartDate,
     activityEndDate,
+    activityDatePreset,
     activitySortOrder,
   ]);
 
@@ -1545,22 +1551,10 @@ export function InvestmentsView() {
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-ink-muted">Date Range:</span>
-                  <input
-                    type="date"
-                    aria-label="Activity start date"
-                    value={activityStartDate}
-                    onChange={(e) => setActivityStartDate(e.target.value)}
-                    className="h-9 rounded-lg border border-line bg-surface px-2.5 text-xs tabular-nums text-ink"
-                  />
-                  <span className="text-ink-muted">to</span>
-                  <input
-                    type="date"
-                    aria-label="Activity end date"
-                    value={activityEndDate}
-                    onChange={(e) => setActivityEndDate(e.target.value)}
-                    className="h-9 rounded-lg border border-line bg-surface px-2.5 text-xs tabular-nums text-ink"
-                  />
+                  <DateRangeFilter value={activityDatePreset} onPresetChange={setActivityDatePreset}
+                    startDate={activityStartDate} endDate={activityEndDate}
+                    onStartDateChange={setActivityStartDate} onEndDateChange={setActivityEndDate}
+                    className="flex flex-wrap items-end gap-2" />
                 </div>
                 <Button size="sm" onClick={() => openTradeModal('buy', null)}>
                   <Plus className="h-3.5 w-3.5" aria-hidden="true" />

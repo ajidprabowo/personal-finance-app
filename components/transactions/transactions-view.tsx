@@ -25,6 +25,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { TransactionDetailModal } from '@/components/transactions/transaction-detail-modal';
+import { DateRangeFilter } from '@/components/shared/date-range-filter';
 import { TransactionFormModal } from '@/components/transactions/transaction-form-modal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -67,17 +68,6 @@ import type {
   TransactionType,
 } from '@/types/entities';
 
-const PERIOD_PRESETS: Array<{ value: ReportingPeriodPreset; label: string }> = [
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: 'last_3_months', label: 'Last 3 Months' },
-  { value: 'last_6_months', label: 'Last 6 Months' },
-  { value: 'this_year', label: 'This Year' },
-  { value: 'last_year', label: 'Last Year' },
-  { value: 'all_time', label: 'All Time' },
-  { value: 'custom', label: 'Custom Range' },
-];
-
 const ACCOUNT_TYPE_SHORT: Record<AccountType, string> = {
   bank: 'Bank',
   cash: 'Cash',
@@ -91,7 +81,7 @@ const ACCOUNT_TYPE_SHORT: Record<AccountType, string> = {
 export function TransactionsView() {
   const searchParams = useSearchParams();
   const { preferences } = useBootstrap();
-  const { t, periodLabel } = useI18n();
+  const { t } = useI18n();
   const { confirm } = useConfirmDialog();
   const { notifySuccess, notifyError } = useNotifications();
 
@@ -108,16 +98,7 @@ export function TransactionsView() {
     const presetParam = searchParams.get('preset') as ReportingPeriodPreset | null;
     if (
       presetParam &&
-      [
-        'this_month',
-        'last_month',
-        'last_3_months',
-        'last_6_months',
-        'this_year',
-        'last_year',
-        'all_time',
-        'custom',
-      ].includes(presetParam)
+      ['this_month', 'this_year', 'custom'].includes(presetParam)
     ) {
       return presetParam;
     }
@@ -341,7 +322,6 @@ export function TransactionsView() {
   };
 
   const activeRangeLabel = useMemo(() => {
-    if (periodPreset === 'all_time') return 'All recorded dates';
     const startLabel = activeDateRange.startDate
       ? formatDisplayDate(activeDateRange.startDate, dateFormat)
       : 'Start';
@@ -386,74 +366,10 @@ export function TransactionsView() {
           {/* Period Selector + Summary KPI Cards */}
           <section aria-label="Financial summary" className="space-y-4">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {PERIOD_PRESETS.map((preset) => {
-                  const selected = periodPreset === preset.value;
-                  return (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => {
-                        setPeriodPreset(preset.value);
-                        setPage(1);
-                      }}
-                      className={cn(
-                        'inline-flex h-8 items-center whitespace-nowrap rounded-lg border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent',
-                        selected
-                          ? 'border-brand-primary bg-brand-primary text-brand-primary-foreground'
-                          : 'border-line bg-surface text-ink-muted hover:bg-surface-muted hover:text-ink'
-                      )}
-                    >
-                      {periodLabel(preset.value)}
-                    </button>
-                  );
-                })}
-              </div>
+              <DateRangeFilter value={periodPreset} onPresetChange={(preset) => { setPeriodPreset(preset); setPage(1); }} startDate={customStart} endDate={customEnd} onStartDateChange={(date) => { setCustomStart(date); setPage(1); }} onEndDateChange={(date) => { setCustomEnd(date); setPage(1); }} variant="buttons" />
               <p className="font-mono text-xs tabular-nums text-ink-muted">{activeRangeLabel}</p>
             </div>
 
-            {periodPreset === 'custom' ? (
-              <Card padding="sm" className="bg-surface-muted/60">
-                <div className="grid gap-3 sm:grid-cols-2 md:max-w-md">
-                  <div>
-                    <label
-                      htmlFor="custom-start-date"
-                      className="mb-1 block text-xs font-medium text-ink"
-                    >
-                      Start Date
-                    </label>
-                    <input
-                      id="custom-start-date"
-                      type="date"
-                      value={customStart}
-                      onChange={(e) => {
-                        setCustomStart(e.target.value);
-                        setPage(1);
-                      }}
-                      className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-xs tabular-nums text-ink focus-visible:border-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="custom-end-date"
-                      className="mb-1 block text-xs font-medium text-ink"
-                    >
-                      End Date
-                    </label>
-                    <input
-                      id="custom-end-date"
-                      type="date"
-                      value={customEnd}
-                      onChange={(e) => {
-                        setCustomEnd(e.target.value);
-                        setPage(1);
-                      }}
-                      className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-xs tabular-nums text-ink focus-visible:border-brand-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent"
-                    />
-                  </div>
-                </div>
-              </Card>
-            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card padding="md">
@@ -779,33 +695,21 @@ export function TransactionsView() {
               <EmptyState
                 icon={<ArrowLeftRight className="h-5 w-5" aria-hidden="true" />}
                 title={
-                  hasActiveFilters || periodPreset !== 'all_time'
+                  hasActiveFilters || true
                     ? 'No transactions match this period or filter'
                     : 'No transactions recorded yet'
                 }
                 description={
-                  hasActiveFilters || periodPreset !== 'all_time'
-                    ? 'Try switching the reporting period to All Time or resetting your active search and filters.'
+                  hasActiveFilters || true
+                    ? 'Try changing the reporting period or resetting your active search and filters.'
                     : 'Record your first income, expense, or internal transfer to start tracking local balances.'
                 }
                 action={
-                  hasActiveFilters || periodPreset !== 'all_time' ? (
+                  hasActiveFilters || true ? (
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       {hasActiveFilters ? (
                         <Button variant="outline" size="sm" onClick={handleResetFilters}>
                           Reset Filters
-                        </Button>
-                      ) : null}
-                      {periodPreset !== 'all_time' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPeriodPreset('all_time');
-                            setPage(1);
-                          }}
-                        >
-                          View All Time
                         </Button>
                       ) : null}
                       {activeAccounts.length > 0 ? (
