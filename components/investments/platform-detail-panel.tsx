@@ -169,6 +169,11 @@ export function PlatformDetailPanel({
           </p>
         </Card>
       </div>
+      {summary.missingFxCurrencies.length > 0 ? (
+        <div role="status" className="rounded-lg border border-status-warning/40 bg-status-warning/10 px-4 py-3 text-sm text-ink">
+          Add a manual FX rate for {summary.missingFxCurrencies.join(', ')} to include all balances and holdings in this platform total.
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-12">
         <Card padding="md" className="lg:col-span-4">

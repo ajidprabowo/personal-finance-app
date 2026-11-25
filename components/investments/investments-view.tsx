@@ -869,6 +869,11 @@ export function InvestmentsView() {
                           Holdings: {formatCurrency(p.holdingsValue, p.currency, numberFormat)}
                         </span>
                       </div>
+                      {p.missingFxCurrencies.length > 0 ? (
+                        <p role="status" className="mt-2 text-[11px] text-status-warning">
+                          Missing manual FX rate: {p.missingFxCurrencies.join(', ')}
+                        </p>
+                      ) : null}
                     </Card>
                   ))}
               </div>

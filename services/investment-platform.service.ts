@@ -8,12 +8,17 @@ import {
   assetClassesRepository,
   holdingsRepository,
   investmentPlatformsRepository,
+  preferencesRepository,
 } from '@/repositories';
 import {
   getAccountBalancesSnapshot,
   resolveHoldingMarketValue,
 } from '@/services/account-balance.service';
 import { computeUnrealizedPnl } from '@/services/cost-basis.service';
+import {
+  convertCurrencyWithManualRate,
+  findManualFxRate,
+} from '@/services/portfolio-valuation.service';
 import { enrichHoldingRecord, type HoldingEnriched } from '@/services/holding.service';
 import {
   listInvestmentActivitiesFiltered,
@@ -41,6 +46,7 @@ export interface PlatformWithMetrics {
   feesTotal: number;
   holdingCount: number;
   activeHoldingCount: number;
+  missingFxCurrencies: string[];
 }
 
 export interface PlatformAssetAllocationSlice {
@@ -203,16 +209,16 @@ export async function listPlatformsWithMetrics(options?: {
   recordOrigin?: RecordOrigin;
 }): Promise<PlatformWithMetrics[]> {
   const origin = options?.recordOrigin ?? 'user';
-  const [platforms, holdings, balances, activities] = await Promise.all([
+  const [platforms, holdings, balances, activities, preferences] = await Promise.all([
     origin === 'test'
       ? investmentPlatformsRepository.getTestRecords()
       : investmentPlatformsRepository.getUserRecords(),
     origin === 'test' ? holdingsRepository.getTestRecords() : holdingsRepository.getUserRecords(),
     getAccountBalancesSnapshot({ recordOrigin: origin }),
     listInvestmentActivitiesFiltered({ recordOrigin: origin }),
+    preferencesRepository.getAll(),
   ]);
-
-  const balanceByAccountId = new Map(balances.items.map((item) => [item.account.id, item]));
+  const manualFxRates = preferences[0]?.manualFxRates ?? [];
 
   const filteredPlatforms =
     options?.includeArchived === false ? platforms.filter((p) => !p.isArchived) : platforms;
@@ -221,10 +227,29 @@ export async function listPlatformsWithMetrics(options?: {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
     .map((platform) => {
       const currency = platform.defaultCurrency.toUpperCase();
-      const cashItem = platform.cashAccountId
-        ? balanceByAccountId.get(platform.cashAccountId)
-        : undefined;
-      const cashBalance = cashItem ? cashItem.currentBalance : 0;
+      const missingFxCurrencies = new Set<string>();
+      const convert = (amount: number, fromCurrency: string): number | null => {
+        const from = fromCurrency.toUpperCase();
+        if (from === currency) return roundCurrencyAmount(amount, currency);
+        if (amount === 0) return 0;
+        const rate = findManualFxRate(manualFxRates, from, currency);
+        if (!rate) {
+          missingFxCurrencies.add(from);
+          return null;
+        }
+        return convertCurrencyWithManualRate(amount, from, currency, rate).convertedAmount;
+      };
+      const platformCashItems = balances.items.filter(
+        (item) =>
+          item.account.platformId === platform.id && item.account.type === 'investment_cash'
+      );
+      let cashBalance = 0;
+      for (const cashItem of platformCashItems) {
+        const converted = convert(cashItem.currentBalance, cashItem.account.currency);
+        if (converted !== null) {
+          cashBalance = roundCurrencyAmount(addDecimal(cashBalance, converted), currency);
+        }
+      }
 
       const platHoldings = holdings.filter((h) => h.platformId === platform.id);
       let holdingsValue = 0;
@@ -240,17 +265,22 @@ export async function listPlatformsWithMetrics(options?: {
           h.remainingCostBasis ?? h.quantity * (h.averageCostPerUnit || 0),
           h.currency
         );
-        if (h.currency.toUpperCase() === currency) {
-          holdingsValue = roundCurrencyAmount(addDecimal(holdingsValue, mv), currency);
-          remainingCostBasis = roundCurrencyAmount(addDecimal(remainingCostBasis, cb), currency);
+        const convertedMv = convert(mv, h.currency);
+        const convertedCb = convert(cb, h.currency);
+        if (convertedMv !== null && convertedCb !== null) {
+          holdingsValue = roundCurrencyAmount(addDecimal(holdingsValue, convertedMv), currency);
+          remainingCostBasis = roundCurrencyAmount(
+            addDecimal(remainingCostBasis, convertedCb),
+            currency
+          );
           if (h.priceRecorded === true) {
             pricedRemainingCostBasis = roundCurrencyAmount(
-              addDecimal(pricedRemainingCostBasis, cb),
+              addDecimal(pricedRemainingCostBasis, convertedCb),
               currency
             );
           }
           realizedPnlTotal = roundCurrencyAmount(
-            addDecimal(realizedPnlTotal, h.realizedPnlTotal ?? 0),
+            addDecimal(realizedPnlTotal, convert(h.realizedPnlTotal ?? 0, h.currency) ?? 0),
             currency
           );
         }
@@ -260,17 +290,26 @@ export async function listPlatformsWithMetrics(options?: {
       let feesTotal = 0;
       for (const item of activities) {
         const act = item.activity;
-        if (act.platformId !== platform.id || act.currency.toUpperCase() !== currency) continue;
+        if (act.platformId !== platform.id) continue;
+        const convertActivityAmount = (amount: number) => convert(amount, act.currency);
         if (act.activityType === 'dividend' || act.activityType === 'interest') {
           const net = act.netAmount ?? Math.max(0, subtractDecimal(act.grossAmount, act.feeAmount));
+          const convertedNet = convertActivityAmount(net);
+          if (convertedNet === null) continue;
           dividendAndInterestTotal = roundCurrencyAmount(
-            addDecimal(dividendAndInterestTotal, net),
+            addDecimal(dividendAndInterestTotal, convertedNet),
             currency
           );
         } else if (act.activityType === 'fee') {
-          feesTotal = roundCurrencyAmount(addDecimal(feesTotal, act.feeAmount), currency);
+          const convertedFee = convertActivityAmount(act.feeAmount);
+          if (convertedFee !== null) {
+            feesTotal = roundCurrencyAmount(addDecimal(feesTotal, convertedFee), currency);
+          }
         } else if (act.activityType === 'buy' || act.activityType === 'sell' || act.activityType === 'partial_sell') {
-          feesTotal = roundCurrencyAmount(addDecimal(feesTotal, act.feeAmount), currency);
+          const convertedFee = convertActivityAmount(act.feeAmount);
+          if (convertedFee !== null) {
+            feesTotal = roundCurrencyAmount(addDecimal(feesTotal, convertedFee), currency);
+          }
         }
       }
 
@@ -295,6 +334,7 @@ export async function listPlatformsWithMetrics(options?: {
         feesTotal,
         holdingCount: platHoldings.length,
         activeHoldingCount,
+        missingFxCurrencies: Array.from(missingFxCurrencies).sort(),
       };
     });
 
@@ -311,7 +351,7 @@ export async function getPlatformDetail(
   }
 ): Promise<PlatformDetailSnapshot> {
   const origin = options?.recordOrigin ?? 'user';
-  const [allMetrics, holdings, assetClasses, activities] = await Promise.all([
+  const [allMetrics, holdings, assetClasses, activities, preferences] = await Promise.all([
     listPlatformsWithMetrics({ includeArchived: true, recordOrigin: origin }),
     holdingsRepository.getByPlatformId(platformId),
     origin === 'test'
@@ -325,6 +365,7 @@ export async function getPlatformDetail(
       endDate: options?.endDate ?? null,
       sortOrder: 'newest',
     }),
+    preferencesRepository.getAll(),
   ]);
 
   const summary = allMetrics.find((m) => m.platform.id === platformId);
@@ -333,6 +374,18 @@ export async function getPlatformDetail(
   }
 
   const assetClassMap = new Map(assetClasses.map((ac) => [ac.id, ac]));
+  const manualFxRates = preferences[0]?.manualFxRates ?? [];
+  const missingFxCurrencies = new Set(summary.missingFxCurrencies);
+  const convert = (amount: number, fromCurrency: string): number | null => {
+    const from = fromCurrency.toUpperCase();
+    if (from === summary.currency) return roundCurrencyAmount(amount, summary.currency);
+    const rate = findManualFxRate(manualFxRates, from, summary.currency);
+    if (!rate) {
+      if (amount !== 0) missingFxCurrencies.add(from);
+      return amount === 0 ? 0 : null;
+    }
+    return convertCurrencyWithManualRate(amount, from, summary.currency, rate).convertedAmount;
+  };
   const enrichedHoldings = holdings
     .filter((h) => h.recordOrigin === origin)
     .map((h) => {
@@ -352,9 +405,13 @@ export async function getPlatformDetail(
   let totalHoldingsValue = 0;
 
   for (const item of enrichedHoldings) {
-    if (item.holding.currency.toUpperCase() !== summary.currency) continue;
+    const marketValue = convert(item.marketValue, item.holding.currency);
+    const costBasis = item.priceRecorded
+      ? convert(item.remainingCostBasis, item.holding.currency)
+      : 0;
+    if (marketValue === null || costBasis === null) continue;
     totalHoldingsValue = roundCurrencyAmount(
-      addDecimal(totalHoldingsValue, item.marketValue),
+      addDecimal(totalHoldingsValue, marketValue),
       summary.currency
     );
 
@@ -369,12 +426,12 @@ export async function getPlatformDetail(
     };
 
     existing.marketValue = roundCurrencyAmount(
-      addDecimal(existing.marketValue, item.marketValue),
+      addDecimal(existing.marketValue, marketValue),
       summary.currency
     );
-    if (item.priceRecorded) {
+    if (item.priceRecorded && costBasis !== null) {
       existing.costBasis = roundCurrencyAmount(
-        addDecimal(existing.costBasis, item.remainingCostBasis),
+        addDecimal(existing.costBasis, costBasis),
         summary.currency
       );
     }
@@ -396,7 +453,7 @@ export async function getPlatformDetail(
     .sort((a, b) => b.marketValue - a.marketValue);
 
   return {
-    summary,
+    summary: { ...summary, missingFxCurrencies: Array.from(missingFxCurrencies).sort() },
     holdings: enrichedHoldings,
     assetAllocation,
     activities,

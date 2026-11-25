@@ -183,6 +183,45 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
     );
   });
 
+  it('converts mixed-currency Pluang cash and holdings into platform IDR totals without changing native values', async () => {
+    const platform = await createInvestmentPlatformWithCashAccount({
+      name: 'Pluang',
+      kind: 'brokerage',
+      defaultCurrency: 'IDR',
+      initialCashBalance: 50_000_000,
+    });
+    await saveManualFxRate({ fromCurrency: 'USD', toCurrency: 'IDR', rate: 16_000, date: '2026-11-01' });
+    const db = await ensureDatabaseOpen();
+    const timestamp = new Date().toISOString();
+    await db.accounts.add({
+      id: 'pluang-usd-cash', name: 'Pluang USD Cash', type: 'investment_cash', currency: 'USD',
+      initialBalance: 100, platformId: platform.id, isInvestmentPool: false, isArchived: false,
+      sortOrder: 999, isTestData: false, recordOrigin: 'user', createdAt: timestamp, updatedAt: timestamp,
+    });
+
+    const classes = await listAssetClasses();
+    const idrClass = classes.find((item) => item.code === 'INDO_STOCK')!;
+    const usClass = classes.find((item) => item.code === 'US_STOCK')!;
+    const idrHolding = await createHolding({ symbol: 'BBCA', name: 'Bank Central Asia', platformId: platform.id, assetClassId: idrClass.id, currency: 'IDR' });
+    const usdHolding = await createHolding({ symbol: 'AAPL', name: 'Apple Inc.', platformId: platform.id, assetClassId: usClass.id, currency: 'USD' });
+    await recordBuyActivity({ platformId: platform.id, holdingId: idrHolding.id, quantity: 100, unitPrice: 100_000, activityDate: '2026-11-02' });
+    await recordBuyActivity({ platformId: platform.id, holdingId: usdHolding.id, quantity: 2, unitPrice: 100, feeAmount: 5, activityDate: '2026-11-02' });
+    await recordValuationUpdateActivity({ holdingId: idrHolding.id, unitPrice: 110_000, valuationDate: '2026-11-03' });
+    await recordValuationUpdateActivity({ holdingId: usdHolding.id, unitPrice: 120, valuationDate: '2026-11-03' });
+
+    const detail = await getPlatformDetail(platform.id);
+    assert.equal(detail.summary.cashBalance, 38_320_000);
+    assert.equal(detail.summary.holdingsValue, 11_000_000 + 3_840_000);
+    assert.equal(detail.summary.totalPlatformValue, 53_160_000);
+    assert.equal(detail.holdings.find((item) => item.holding.id === usdHolding.id)?.marketValue, 240);
+    assert.equal(detail.holdings.find((item) => item.holding.id === usdHolding.id)?.holding.currency, 'USD');
+
+    const overview = await getInvestmentOverviewSnapshot({ baseCurrency: 'IDR' });
+    assert.equal(overview.byCurrency.USD.holdingsMarketValue, 240);
+    assert.equal(overview.byCurrency.USD.platformCashBalance, 100);
+    assert.equal(overview.convertedTotals.holdingsMarketValue, 14_840_000);
+  });
+
   it('3. Buy, Partial Sell, Full Sell, Weighted Average Cost, and Oversold rejection', async () => {
     const bank = await createUserAccount({
       name: 'BCA Main',
