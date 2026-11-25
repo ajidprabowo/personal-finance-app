@@ -99,6 +99,7 @@ export interface Account extends TestTaggedEntity {
   isInvestmentPool?: boolean;
   isArchived: boolean;
   notes?: string;
+  sortOrder?: number;
 }
 
 /**
@@ -230,6 +231,7 @@ export interface InvestmentPlatform extends TestTaggedEntity {
   isDefault?: boolean;
   isArchived: boolean;
   notes?: string;
+  sortOrder?: number;
 }
 
 /**

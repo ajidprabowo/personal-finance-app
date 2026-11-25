@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { SettingsSection } from '@/components/ui/settings-section';
+import { SortableRow, reorderIds } from '@/components/shared/sortable-row';
 import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useI18n } from '@/hooks/use-i18n';
@@ -20,6 +21,7 @@ import {
   createUserAccount,
   deleteUserAccountSafely,
   listUserAccountsWithBalances,
+  savePriorityOrder,
   toggleUserAccountArchive,
   updateUserAccount,
   type UserAccountWithBalance,
@@ -197,6 +199,16 @@ export function AccountsManagementSection() {
     }
   };
 
+  const handleReorder = async (draggedId: string, targetId: string) => {
+    try {
+      const ordered = reorderIds(accountBalances.map((item) => ({ ...item, id: item.account.id })), draggedId, targetId);
+      await savePriorityOrder('accounts', ordered.map((item) => item.account.id));
+      await reload();
+    } catch (error) {
+      notifyError('Could not save account order', error);
+    }
+  };
+
   const isLinkedPlatformCash = Boolean(
     editingAccount?.type === 'investment_cash' && editingAccount.platformId
   );
@@ -244,10 +256,13 @@ export function AccountsManagementSection() {
             const acc = item.account;
             const isPlatformCash = acc.type === 'investment_cash' && Boolean(acc.platformId);
             return (
-              <div
+              <SortableRow
                 key={acc.id}
-                className="flex flex-col justify-between gap-3 px-5 py-3.5 sm:flex-row sm:items-center"
+                id={acc.id}
+                onMove={handleReorder}
+                className="flex items-center gap-1 px-5 py-3.5"
               >
+              <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium text-ink">{acc.name}</p>
@@ -343,6 +358,7 @@ export function AccountsManagementSection() {
                   </div>
                 </div>
               </div>
+              </SortableRow>
             );
           })
         )}

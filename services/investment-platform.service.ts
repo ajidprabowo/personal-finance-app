@@ -88,12 +88,14 @@ export async function createInvestmentPlatformWithCashAccount(
   const cashAccountId = `acc_cash_${platformId}`;
 
   return db.transaction('rw', [db.investmentPlatforms, db.accounts], async () => {
+    const existingAccounts = await db.accounts.toArray();
     await db.accounts.add({
       id: cashAccountId,
       name: `${name} Cash`,
       type: 'investment_cash',
       currency,
       initialBalance: initialCash,
+      sortOrder: existingAccounts.reduce((max, account) => Math.max(max, account.sortOrder ?? 0), 0) + 1,
       platformId,
       isInvestmentPool: false,
       isArchived: false,
@@ -111,6 +113,7 @@ export async function createInvestmentPlatformWithCashAccount(
       defaultCurrency: currency,
       cashAccountId,
       supportsInvestmentPool: input.supportsInvestmentPool ?? true,
+      sortOrder: (await db.investmentPlatforms.toArray()).reduce((max, item) => Math.max(max, item.sortOrder ?? 0), 0) + 1,
       isDefault: false,
       isArchived: false,
       notes: input.notes?.trim() || undefined,
@@ -215,7 +218,7 @@ export async function listPlatformsWithMetrics(options?: {
     options?.includeArchived === false ? platforms.filter((p) => !p.isArchived) : platforms;
 
   const metrics: PlatformWithMetrics[] = filteredPlatforms
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
     .map((platform) => {
       const currency = platform.defaultCurrency.toUpperCase();
       const cashItem = platform.cashAccountId

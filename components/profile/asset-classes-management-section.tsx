@@ -7,6 +7,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { SettingsSection } from '@/components/ui/settings-section';
+import { SortableRow, reorderIds } from '@/components/shared/sortable-row';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useI18n } from '@/hooks/use-i18n';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -18,6 +19,7 @@ import {
   updateAssetClass,
   type AssetClassWithUsage,
 } from '@/services/asset-class.service';
+import { savePriorityOrder } from '@/services/settings.service';
 import type { AssetClass } from '@/types/entities';
 
 export function AssetClassesManagementSection() {
@@ -139,6 +141,16 @@ export function AssetClassesManagementSection() {
     }
   };
 
+  const handleReorder = async (draggedId: string, targetId: string) => {
+    try {
+      const ordered = reorderIds(items.map((item) => ({ ...item, id: item.assetClass.id })), draggedId, targetId);
+      await savePriorityOrder('assetClasses', ordered.map((item) => item.assetClass.id));
+      await reload();
+    } catch (error) {
+      notifyError('Could not save asset class order', error);
+    }
+  };
+
   return (
     <>
       <SettingsSection
@@ -158,10 +170,13 @@ export function AssetClassesManagementSection() {
           items.map((item) => {
             const ac = item.assetClass;
             return (
-              <div
+              <SortableRow
                 key={ac.id}
-                className="flex flex-col justify-between gap-3 px-5 py-3.5 sm:flex-row sm:items-center"
+                id={ac.id}
+                onMove={handleReorder}
+                className="flex items-center gap-1 px-5 py-3.5"
               >
+              <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium text-ink">{ac.name}</p>
@@ -228,6 +243,7 @@ export function AssetClassesManagementSection() {
                   )}
                 </div>
               </div>
+              </SortableRow>
             );
           })
         )}

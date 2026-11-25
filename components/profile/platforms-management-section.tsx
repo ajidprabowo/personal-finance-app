@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { SettingsSection } from '@/components/ui/settings-section';
+import { SortableRow, reorderIds } from '@/components/shared/sortable-row';
 import { useBootstrap } from '@/hooks/use-bootstrap';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useI18n } from '@/hooks/use-i18n';
@@ -18,6 +19,7 @@ import {
   createCustomInvestmentPlatform,
   deleteInvestmentPlatformSafely,
   listUserInvestmentPlatformsWithDetails,
+  savePriorityOrder,
   toggleInvestmentPlatformStatus,
   updateInvestmentPlatform,
   type InvestmentPlatformWithDetails,
@@ -165,6 +167,16 @@ export function PlatformsManagementSection() {
     }
   };
 
+  const handleReorder = async (draggedId: string, targetId: string) => {
+    try {
+      const ordered = reorderIds(details.map((item) => ({ ...item, id: item.platform.id })), draggedId, targetId);
+      await savePriorityOrder('platforms', ordered.map((item) => item.platform.id));
+      await reload();
+    } catch (error) {
+      notifyError('Could not save platform order', error);
+    }
+  };
+
   return (
     <>
       <SettingsSection
@@ -185,8 +197,9 @@ export function PlatformsManagementSection() {
             const plat = item.platform;
             const isExpanded = expandedPlatformId === plat.id;
             return (
-              <div key={plat.id} className="divide-y divide-line/60">
-                <div className="flex flex-col justify-between gap-3 px-5 py-3.5 sm:flex-row sm:items-center">
+              <SortableRow key={plat.id} id={plat.id} onMove={handleReorder} className="flex items-start gap-1 px-5">
+                <div className="min-w-0 flex-1 divide-y divide-line/60">
+                <div className="flex flex-col justify-between gap-3 py-3.5 sm:flex-row sm:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-medium text-ink">{plat.name}</p>
@@ -308,7 +321,8 @@ export function PlatformsManagementSection() {
                     </div>
                   </div>
                 ) : null}
-              </div>
+                </div>
+              </SortableRow>
             );
           })
         )}

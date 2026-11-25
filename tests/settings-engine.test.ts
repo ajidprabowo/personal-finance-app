@@ -45,8 +45,10 @@ import {
   deleteUserSubcategorySafely,
   getStorageAndDiagnostics,
   listUserAccountsWithBalances,
+  listUserAccounts,
   listUserCategoriesWithCounts,
   listUserInvestmentPlatformsWithDetails,
+  savePriorityOrder,
   listUserSubcategories,
   toggleCategoryArchive,
   toggleInvestmentPlatformStatus,
@@ -77,6 +79,47 @@ describe('Stage 7 — Profile & Settings Refinement Engine & v7 Migration', () =
   beforeEach(async () => {
     resetDatabaseInstance();
     installationId = await resetLocalDatabaseForTest();
+  });
+
+  it('persists custom priority order for accounts, categories, platforms, and asset classes', async () => {
+    const accountA = await createUserAccount({ name: 'Priority Account A', type: 'bank', currency: 'IDR' });
+    const accountB = await createUserAccount({ name: 'Priority Account B', type: 'bank', currency: 'IDR' });
+    const accountsBefore = await listUserAccounts();
+    const accountIds = [...accountsBefore].reverse().map((item) => item.id);
+    await savePriorityOrder('accounts', accountIds);
+    assert.deepEqual((await listUserAccounts()).map((item) => item.id).filter((id) => accountIds.includes(id)), accountIds);
+
+    const categoryA = await createCustomCategory({ name: 'Priority Expense A', kind: 'expense' });
+    const categoryB = await createCustomCategory({ name: 'Priority Expense B', kind: 'expense' });
+    const categoriesBefore = (await listUserCategoriesWithCounts()).categories;
+    const categoryIds = [...categoriesBefore].reverse().map((item) => item.id);
+    await savePriorityOrder('categories', categoryIds);
+    assert.deepEqual((await listUserCategoriesWithCounts()).categories.map((item) => item.id), categoryIds);
+
+    const platformA = await createCustomInvestmentPlatform({ name: 'Priority Platform A', kind: 'brokerage', defaultCurrency: 'USD', supportsInvestmentPool: true });
+    const platformB = await createCustomInvestmentPlatform({ name: 'Priority Platform B', kind: 'brokerage', defaultCurrency: 'USD', supportsInvestmentPool: true });
+    const platformsBefore = await listUserInvestmentPlatformsWithDetails();
+    const platformIds = [...platformsBefore].reverse().map((item) => item.platform.id);
+    await savePriorityOrder('platforms', platformIds);
+    assert.deepEqual((await listUserInvestmentPlatformsWithDetails()).map((item) => item.platform.id), platformIds);
+
+    const classA = await createAssetClass({ name: 'Priority Class A', code: 'PRIORITY_A' });
+    const classB = await createAssetClass({ name: 'Priority Class B', code: 'PRIORITY_B' });
+    const classesBefore = await listAssetClassesWithUsage();
+    const classIds = [...classesBefore].reverse().map((item) => item.assetClass.id);
+    await savePriorityOrder('assetClasses', classIds);
+    assert.deepEqual((await listAssetClassesWithUsage()).map((item) => item.assetClass.id), classIds);
+
+    assert.equal([accountA, accountB].every((item) => accountIds.includes(item.id)), true);
+    assert.equal([categoryA, categoryB].every((item) => categoryIds.includes(item.id)), true);
+    assert.equal([platformA, platformB].every((item) => platformIds.includes(item.id)), true);
+    assert.equal([classA, classB].every((item) => classIds.includes(item.id)), true);
+
+    resetDatabaseInstance();
+    assert.deepEqual((await listUserAccounts()).map((item) => item.id).filter((id) => accountIds.includes(id)), accountIds);
+    assert.deepEqual((await listUserCategoriesWithCounts()).categories.map((item) => item.id), categoryIds);
+    assert.deepEqual((await listUserInvestmentPlatformsWithDetails()).map((item) => item.platform.id), platformIds);
+    assert.deepEqual((await listAssetClassesWithUsage()).map((item) => item.assetClass.id), classIds);
   });
 
   it('1. Personal Information & Preferences validation, persistence, formatting, and week-start logic', async () => {

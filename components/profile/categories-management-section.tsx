@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
 import { SettingsSection } from '@/components/ui/settings-section';
+import { SortableRow, reorderIds } from '@/components/shared/sortable-row';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useI18n } from '@/hooks/use-i18n';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -28,6 +29,7 @@ import {
   deleteCustomCategory,
   deleteUserSubcategorySafely,
   listUserCategoriesWithCounts,
+  savePriorityOrder,
   toggleCategoryArchive,
   updateUserCategory,
   updateUserSubcategory,
@@ -269,6 +271,16 @@ export function CategoriesManagementSection() {
     }
   };
 
+  const handleReorder = async (draggedId: string, targetId: string) => {
+    try {
+      const ordered = reorderIds(categories, draggedId, targetId);
+      await savePriorityOrder('categories', ordered.map((category) => category.id));
+      await reload();
+    } catch (error) {
+      notifyError('Could not save category order', error);
+    }
+  };
+
   return (
     <>
       <SettingsSection
@@ -320,7 +332,8 @@ export function CategoriesManagementSection() {
             const catSubs = subcategoriesByCategory.get(cat.id) ?? [];
 
             return (
-              <div key={cat.id} className="divide-y divide-line/60">
+              <SortableRow key={cat.id} id={cat.id} onMove={handleReorder} className="flex items-start gap-1">
+              <div className="min-w-0 flex-1 divide-y divide-line/60">
                 <div className="flex flex-col justify-between gap-3 px-5 py-3.5 sm:flex-row sm:items-center">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-muted text-ink">
@@ -539,6 +552,7 @@ export function CategoriesManagementSection() {
                   </div>
                 ) : null}
               </div>
+              </SortableRow>
             );
           })
         )}

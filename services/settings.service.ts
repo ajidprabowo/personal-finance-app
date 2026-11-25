@@ -159,7 +159,27 @@ export async function updateUserPreferences(
 // Accounts Management
 export async function listUserAccounts(): Promise<Account[]> {
   const accounts = await accountsRepository.getUserRecords();
-  return accounts.sort((a, b) => a.name.localeCompare(b.name));
+  return accounts.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+}
+
+export type PriorityListType = 'accounts' | 'categories' | 'platforms' | 'assetClasses';
+
+/** Persist user-defined order without modifying any linked financial records. */
+export async function savePriorityOrder(type: PriorityListType, orderedIds: string[]): Promise<void> {
+  const db = await ensureDatabaseOpen();
+  const table = {
+    accounts: db.accounts,
+    categories: db.categories,
+    platforms: db.investmentPlatforms,
+    assetClasses: db.assetClasses,
+  }[type];
+  await db.transaction('rw', table, async () => {
+    for (const [index, id] of orderedIds.entries()) {
+      const item = await table.get(id);
+      if (!item || item.recordOrigin !== 'user') continue;
+      await table.update(id, { sortOrder: index + 1, updatedAt: nowIso() });
+    }
+  });
 }
 
 export interface UserAccountWithBalance extends AccountBalanceItem {
@@ -173,7 +193,7 @@ export async function listUserAccountsWithBalances(): Promise<UserAccountWithBal
     investmentActivitiesRepository.getUserRecords(),
   ]);
 
-  const sorted = [...accounts].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...accounts].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
   const summary = calculateAccountBalances(sorted, transactions, activities);
   const txCounts = new Map<string, number>();
 
@@ -209,6 +229,7 @@ export async function createUserAccount(input: {
   }
 
   const currency = (input.currency || APP_CONFIG.defaultCurrency).toUpperCase();
+  const existingOrder = await accountsRepository.getUserRecords();
   const initialBalance = roundCurrencyAmount(Number(input.initialBalance ?? 0) || 0, currency);
 
   if (input.type === 'investment_pool') {
@@ -230,6 +251,7 @@ export async function createUserAccount(input: {
     type: input.type,
     currency,
     initialBalance,
+    sortOrder: existingOrder.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), 0) + 1,
     notes: input.notes?.trim() || undefined,
     isInvestmentPool: input.type === 'investment_pool',
     isArchived: Boolean(input.isArchived),
@@ -602,7 +624,7 @@ export async function listUserInvestmentPlatformsWithDetails(): Promise<
   );
 
   return platforms
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
     .map((platform) => {
       const linkedCash = platform.cashAccountId
         ? balanceByAccountId.get(platform.cashAccountId)
@@ -647,12 +669,14 @@ export async function createCustomInvestmentPlatform(input: {
   const cashAccountId = `acc_cash_${platformId}`;
 
   return db.transaction('rw', [db.investmentPlatforms, db.accounts], async () => {
+    const accountOrder = await db.accounts.toArray();
     await db.accounts.add({
       id: cashAccountId,
       name: `${name} Cash`,
       type: 'investment_cash',
       currency,
       initialBalance: 0,
+      sortOrder: accountOrder.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), 0) + 1,
       platformId,
       isInvestmentPool: false,
       isArchived: false,
@@ -670,6 +694,7 @@ export async function createCustomInvestmentPlatform(input: {
       defaultCurrency: currency,
       cashAccountId,
       supportsInvestmentPool: input.supportsInvestmentPool,
+      sortOrder: existingPlatforms.reduce((max, item) => Math.max(max, item.sortOrder ?? 0), 0) + 1,
       isDefault: false,
       isArchived: false,
       isTestData: false,
