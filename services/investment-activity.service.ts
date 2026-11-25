@@ -3,6 +3,8 @@ import { APP_CONFIG } from '@/lib/config';
 import { roundCurrencyAmount } from '@/lib/currency';
 import { isValidDateString, nowIso, todayDateString } from '@/lib/dates';
 import { DatabaseError, SafetyGuardError, ValidationError } from '@/lib/errors';
+import { getManualFxRates, findManualFxRate, convertCurrencyWithManualRate } from '@/services/portfolio-valuation.service';
+import { getAccountBalancesSnapshot } from '@/services/account-balance.service';
 import {
   addDecimal,
   divideDecimal,
@@ -168,7 +170,9 @@ export async function recordBuyActivity(
     throw new ValidationError('Transaction date must be a valid YYYY-MM-DD calendar date.');
   }
 
+  const cashBalances = await getAccountBalancesSnapshot({ recordOrigin: origin });
   const db = await ensureDatabaseOpen();
+  const fxRates = await getManualFxRates();
   return db.transaction(
     'rw',
     [db.investmentPlatforms, db.accounts, db.holdings, db.investmentActivities],
@@ -195,6 +199,13 @@ export async function recordBuyActivity(
         throw new ValidationError(`Platform cash account for "${platform.name}" is inactive.`);
       }
 
+      const fxRate = holding.currency === cashAccount.currency
+        ? null
+        : findManualFxRate(fxRates, holding.currency, cashAccount.currency, activityDate);
+      const fxConversion = holding.currency === cashAccount.currency
+        ? null
+        : convertCurrencyWithManualRate(1, holding.currency, cashAccount.currency, fxRate);
+
       const calc = computeBuyPositionUpdate(
         {
           quantity: holding.quantity,
@@ -212,6 +223,15 @@ export async function recordBuyActivity(
         }
       );
 
+      const settlementAmount = roundCurrencyAmount(
+        fxConversion ? multiplyDecimal(calc.totalCashOutflow, fxConversion.rate) : calc.totalCashOutflow,
+        cashAccount.currency
+      );
+      const available = cashBalances.items.find((item) => item.account.id === cashAccount.id)?.currentBalance ?? 0;
+      if (available < settlementAmount) {
+        throw new ValidationError(`Insufficient cash in ${platform.name} (${cashAccount.currency}).`);
+      }
+
       const timestamp = nowIso();
       const activity: InvestmentActivity = {
         id: crypto.randomUUID(),
@@ -225,6 +245,10 @@ export async function recordBuyActivity(
         feeAmount: calc.feeAmount,
         netAmount: calc.totalCashOutflow,
         currency: holding.currency,
+        settlementAmount,
+        settlementCurrency: cashAccount.currency,
+        settlementFxRate: fxConversion?.rate,
+        settlementFxRateDate: fxRate?.date,
         activityDate,
         description: `Buy ${roundQuantity(input.quantity)} ${holding.symbol} @ ${roundUnitPrice(input.unitPrice)}`,
         notes: input.notes?.trim() || undefined,
@@ -252,7 +276,9 @@ export async function recordSellActivity(
     throw new ValidationError('Transaction date must be a valid YYYY-MM-DD calendar date.');
   }
 
+  const cashBalances = await getAccountBalancesSnapshot({ recordOrigin: origin });
   const db = await ensureDatabaseOpen();
+  const fxRates = await getManualFxRates();
   return db.transaction(
     'rw',
     [db.investmentPlatforms, db.accounts, db.holdings, db.investmentActivities],
@@ -279,6 +305,13 @@ export async function recordSellActivity(
         throw new ValidationError(`Platform cash account for "${platform.name}" is inactive.`);
       }
 
+      const fxRate = holding.currency === cashAccount.currency
+        ? null
+        : findManualFxRate(fxRates, holding.currency, cashAccount.currency, activityDate);
+      const fxConversion = holding.currency === cashAccount.currency
+        ? null
+        : convertCurrencyWithManualRate(1, holding.currency, cashAccount.currency, fxRate);
+
       const calc = computeSellPositionUpdate(
         {
           quantity: holding.quantity,
@@ -294,6 +327,14 @@ export async function recordSellActivity(
           feeAmount: input.feeAmount,
         }
       );
+      const settlementAmount = roundCurrencyAmount(
+        fxConversion ? multiplyDecimal(calc.netProceeds, fxConversion.rate) : calc.netProceeds,
+        cashAccount.currency
+      );
+      // Sales add cash and do not require pre-existing cash.
+      if (settlementAmount <= 0) {
+        throw new ValidationError('Net sale proceeds must be greater than zero after fees.');
+      }
 
       const timestamp = nowIso();
       const activity: InvestmentActivity = {
@@ -310,6 +351,10 @@ export async function recordSellActivity(
         allocatedCostBasis: calc.allocatedCostBasis,
         realizedPnl: calc.realizedPnl,
         currency: holding.currency,
+        settlementAmount,
+        settlementCurrency: cashAccount.currency,
+        settlementFxRate: fxConversion?.rate,
+        settlementFxRateDate: fxRate?.date,
         activityDate,
         description: `Sell ${roundQuantity(input.quantity)} ${holding.symbol} @ ${roundUnitPrice(input.unitPrice)}`,
         notes: input.notes?.trim() || undefined,
@@ -686,6 +731,13 @@ export async function updateInvestmentActivity(
             ? roundCurrencyAmount(addDecimal(gross, nextFee), existing.currency)
             : roundCurrencyAmount(subtractDecimal(gross, nextFee), existing.currency);
 
+        const settlementAmount = existing.settlementCurrency && existing.settlementCurrency !== existing.currency
+          ? roundCurrencyAmount(
+              multiplyDecimal(net, existing.settlementFxRate ?? 1),
+              existing.settlementCurrency
+            )
+          : net;
+
         const updated: InvestmentActivity = {
           ...existing,
           activityDate: nextDate,
@@ -694,6 +746,7 @@ export async function updateInvestmentActivity(
           grossAmount: gross,
           feeAmount: nextFee,
           netAmount: net,
+          settlementAmount,
           description: nextDescription || existing.description,
           notes: nextNotes,
           updatedAt: timestamp,

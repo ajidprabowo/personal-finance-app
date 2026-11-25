@@ -305,6 +305,11 @@ export interface InvestmentActivity extends TestTaggedEntity {
   fxRateToBase?: number;
   fxRateDate?: string;
   fxBaseCurrency?: string;
+  /** Cash settlement recorded separately from the holding's native currency. */
+  settlementAmount?: number;
+  settlementCurrency?: string;
+  settlementFxRate?: number;
+  settlementFxRateDate?: string;
   activityDate: string;
   description?: string;
   notes?: string;

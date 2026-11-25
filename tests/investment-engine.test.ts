@@ -562,6 +562,38 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
     assert.equal(afterFx.convertedTotals.totalNetWorth, 9_000_000);
   });
 
+  it('6a. Cross-currency trades settle in platform cash currency with FX snapshots and cash limits', async () => {
+    const broker = await createInvestmentPlatformWithCashAccount({
+      name: 'Pluang FX', kind: 'brokerage', defaultCurrency: 'IDR', initialCashBalance: 40_000_000,
+    });
+    const usClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
+    const stock = await createHolding({ symbol: 'NVDA', name: 'NVIDIA', platformId: broker.id, assetClassId: usClass.id, currency: 'USD' });
+    await saveManualFxRate({ fromCurrency: 'USD', toCurrency: 'IDR', rate: 16_000, date: '2026-11-10' });
+
+    const buy = await recordBuyActivity({ platformId: broker.id, holdingId: stock.id, quantity: 2, unitPrice: 1_000, feeAmount: 10, activityDate: '2026-11-20' });
+    assert.equal(buy.activity.currency, 'USD');
+    assert.equal(buy.activity.netAmount, 2_010);
+    assert.equal(buy.activity.settlementAmount, 32_160_000);
+    assert.equal(buy.activity.settlementCurrency, 'IDR');
+    assert.equal(buy.activity.settlementFxRate, 16_000);
+    assert.equal(buy.activity.settlementFxRateDate, '2026-11-10');
+    assert.equal(buy.holding.remainingCostBasis, 2_010);
+    assert.equal((await getAccountBalancesSnapshot()).items.find((item) => item.account.id === broker.cashAccountId)!.currentBalance, 7_840_000);
+
+    const sale = await recordSellActivity({ platformId: broker.id, holdingId: stock.id, quantity: 1, unitPrice: 1_200, feeAmount: 5, activityDate: '2026-11-21' });
+    assert.equal(sale.activity.netAmount, 1_195);
+    assert.equal(sale.activity.settlementAmount, 19_120_000);
+    assert.equal((await getAccountBalancesSnapshot()).items.find((item) => item.account.id === broker.cashAccountId)!.currentBalance, 26_960_000);
+    await assert.rejects(() => recordBuyActivity({ platformId: broker.id, holdingId: stock.id, quantity: 100, unitPrice: 1_000, activityDate: '2026-11-22' }), ValidationError);
+  });
+
+  it('6b. Cross-currency trade requires a dated manual FX rate', async () => {
+    const broker = await createInvestmentPlatformWithCashAccount({ name: 'Pluang no FX', kind: 'brokerage', defaultCurrency: 'IDR', initialCashBalance: 100_000_000 });
+    const usClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
+    const stock = await createHolding({ symbol: 'AAPL', name: 'Apple', platformId: broker.id, assetClassId: usClass.id, currency: 'USD' });
+    await assert.rejects(() => recordBuyActivity({ platformId: broker.id, holdingId: stock.id, quantity: 1, unitPrice: 100, activityDate: '2026-11-20' }), /Missing manual FX rate/);
+  });
+
   it('7. Controlled Replay on Edit/Delete, Oversold Rollback, Duplicate Rules, and Validator Integrity', async () => {
     const brokerA = await createInvestmentPlatformWithCashAccount({
       name: 'Broker A',
@@ -665,6 +697,7 @@ describe('Stage 4 — Investment Management & Portfolio Engine', () => {
       name: 'Manual Price Broker',
       kind: 'brokerage',
       defaultCurrency: 'USD',
+      initialCashBalance: 1_000,
     });
     const stockClass = (await listAssetClasses()).find((item) => item.code === 'US_STOCK')!;
     const holding = await createHolding({

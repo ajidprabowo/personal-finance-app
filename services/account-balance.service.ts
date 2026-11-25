@@ -173,20 +173,26 @@ export function calculateAccountBalances(
     const fee = Number.isFinite(act.feeAmount) ? Math.abs(act.feeAmount) : 0;
 
     if (act.activityType === 'buy') {
-      const totalOutflow = roundCurrencyAmount(addDecimal(gross, fee), act.currency);
+      const settlementCurrency = act.settlementCurrency ?? act.currency;
+      const totalOutflow = roundCurrencyAmount(
+        act.settlementAmount ?? addDecimal(gross, fee), settlementCurrency
+      );
       if (totalOutflow > 0) {
         target.totalInvestmentOutflows = roundCurrencyAmount(
           addDecimal(target.totalInvestmentOutflows, totalOutflow),
-          act.currency
+          settlementCurrency
         );
         target.transactionCount += 1;
       }
     } else if (act.activityType === 'sell' || act.activityType === 'partial_sell') {
-      const netProceeds = roundCurrencyAmount(Math.max(0, subtractDecimal(gross, fee)), act.currency);
+      const settlementCurrency = act.settlementCurrency ?? act.currency;
+      const netProceeds = roundCurrencyAmount(
+        act.settlementAmount ?? Math.max(0, subtractDecimal(gross, fee)), settlementCurrency
+      );
       if (netProceeds > 0) {
         target.totalInvestmentInflows = roundCurrencyAmount(
           addDecimal(target.totalInvestmentInflows, netProceeds),
-          act.currency
+          settlementCurrency
         );
       }
       target.transactionCount += 1;
